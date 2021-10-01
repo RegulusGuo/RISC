@@ -74,4 +74,5 @@ class CoreIO extends Bundle with Config {
     val imem  = Flipped(new ImemIO)
     val dmem  = Flipped(new DmemIO)
     val debug = new CoreDebugIO
+    val interrupt = Input(Bool())
 }
