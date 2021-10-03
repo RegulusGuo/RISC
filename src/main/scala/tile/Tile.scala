@@ -12,10 +12,11 @@ import config.Config
 import scala.annotation.switch
 
 class TileIO extends Bundle with Config {
-    val step_clk = Input(Bool())
-    val step_en  = Input(Bool())
+    val step_clk   = Input(Bool())
+    val step_en    = Input(Bool())
     val debug_addr = Input(UInt(7.W))
     val debug_data = Output(UInt(XLEN.W))
+    val interrupt  = Input(Bool())
 }
 
 class Tile extends Module with Config {
@@ -25,8 +26,9 @@ class Tile extends Module with Config {
     val imem = Module(new ROM_D)
     val dmem = Module(new RAM_B)
     
-    core.io.imem  <> imem.io
-    core.io.dmem  <> dmem.io
+    core.io.imem <> imem.io
+    core.io.dmem <> dmem.io
+    // core.io.clk := Mux(io.step_en, io.step_clk, clock)
 
     core.io.debug.bd.debug_addr := io.debug_addr
     when (io.debug_addr(5)) {

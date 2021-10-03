@@ -71,6 +71,7 @@ class CoreDebugIO extends Bundle with Config {
 }
 
 class CoreIO extends Bundle with Config {
+    // val clk   = Input(Clock())
     val imem  = Flipped(new ImemIO)
     val dmem  = Flipped(new DmemIO)
     val debug = new CoreDebugIO
