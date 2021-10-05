@@ -5,41 +5,42 @@ import chisel3.util._
 import config.Config
 
 object Privilege {
-  val U = 0.U(2.W)
-  val S = 1.U(2.W)
-  val M = 3.U(2.W)
+    val U = 0.U(2.W)
+    val S = 1.U(2.W)
+    val H = 2.U(2.W)
+    val M = 3.U(2.W)
 }
 
 object ExceptionCode {
-  val inst_addr_misaligned  = 0
-  val inst_access_fault     = 1
-  val illegal_inst          = 2
-  val breakpoint            = 3
-  val load_addr_misaligned  = 4
-  val load_access_fault     = 5
-  val store_addr_misaligned = 6
-  val store_access_fault    = 7
-  val ecall_U               = 8
-  val ecall_S               = 9
-  val ecall_M               = 11
-  val inst_page_fault       = 12
-  val load_page_fault       = 13
-  val store_page_fault      = 15
+    val inst_addr_misaligned  = 0
+    val inst_access_fault     = 1
+    val illegal_inst          = 2
+    val breakpoint            = 3
+    val load_addr_misaligned  = 4
+    val load_access_fault     = 5
+    val store_addr_misaligned = 6
+    val store_access_fault    = 7
+    val ecall_U               = 8
+    val ecall_S               = 9
+    val ecall_M               = 11
+    val inst_page_fault       = 12
+    val load_page_fault       = 13
+    val store_page_fault      = 15
 
-  val ExcpPriority = Seq(
-    breakpoint,
-    inst_page_fault,
-    inst_access_fault,
-    illegal_inst,
-    inst_addr_misaligned,
-    ecall_U, ecall_S, ecall_M,
-    store_addr_misaligned,
-    load_addr_misaligned,
-    store_page_fault,
-    load_page_fault,
-    store_access_fault,
-    load_access_fault
-  )
+    val ExcpPriority = Seq(
+        breakpoint,
+        inst_page_fault,
+        inst_access_fault,
+        illegal_inst,
+        inst_addr_misaligned,
+        ecall_U, ecall_S, ecall_M,
+        store_addr_misaligned,
+        load_addr_misaligned,
+        store_page_fault,
+        load_page_fault,
+        store_access_fault,
+        load_access_fault
+    )
 }
 
 object InterruptCode {
