@@ -221,6 +221,8 @@ class Backend extends Module with Config with AluOpType {
     csr.io.event_io.is_ecall     := wb_inst_valid && wb_inst.next_pc === EPC
     csr.io.event_io.illegal_inst := wb_inst_valid && wb_inst.illegal_inst
     // TODO
+    csr.io.event_io.inst := DontCare
+    csr.io.event_io.bad_address := DontCare
     csr.io.event_io.mem_access_fault := false.B
     csr.io.event_io.epc := 0.U
     csr.io.event_io.external_int := false.B

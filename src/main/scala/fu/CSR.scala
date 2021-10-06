@@ -12,7 +12,9 @@ class CSREventIO extends Bundle with Config {
     // exception
     val is_ecall         = Input(Bool())
     val illegal_inst     = Input(Bool())
+    val inst             = Input(UInt(XLEN.W))
     val mem_access_fault = Input(Bool())
+    val bad_address      = Input(UInt(XLEN.W))
     val epc              = Input(UInt(XLEN.W))
     // interrupt
     val external_int     = Input(Bool())
@@ -141,7 +143,7 @@ class CSR extends Module with Config {
             cause_no, 0.U(XLEN.W),
             Seq(
                 ExceptionCode.load_access_fault.U -> io.event_io.bad_address,
-                ExceptionCode.illegal_inst.U -> io.event_io.illegal_inst
+                ExceptionCode.illegal_inst.U      -> io.event_io.inst
             )
         )
 
