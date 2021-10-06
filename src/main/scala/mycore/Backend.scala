@@ -71,10 +71,12 @@ class Backend extends Module with Config with AluOpType {
     val ls_addr = ex_rs1_true_data + ex_inst.imm
 
     // WB
-    val regFile = Module(new RegFile(len = 32, nread = 3, nwrite = 1))
     val wb_inst = RegInit(nop)
     val wb_inst_valid = RegInit(true.B)
     val stall_wb    = WireDefault(false.B)
+    val regFile = Module(new RegFile(len = 32, nread = 3, nwrite = 1))
+    val csr     = Module(new CSR)
+    val wb_csr_data = Reg(UInt(XLEN.W))
     val wb_alu_data = Wire(UInt(XLEN.W))
     val wb_lsu_data = Wire(UInt(XLEN.W))
     val wb_data = Wire(UInt(XLEN.W))
@@ -139,22 +141,25 @@ class Backend extends Module with Config with AluOpType {
 
     alu_valid := ex_inst_valid
     lsu_valid := ex_inst_valid
+
     // alu
+    val is_csrc = ex_inst.alu_op === aluAnd.U && ex_inst.alu_src_b === BCSR
     alu.io.a := MuxLookup(
         ex_inst.alu_src_a,
-        // ex_rs1_data,
-        ex_rs1_true_data,
+        Mux(is_csrc, ~ex_rs1_true_data, ex_rs1_true_data),
         Seq(
             APC  -> ex_inst.pc,
-            AIMM -> Cat(0.U(XLEN - 5), ex_inst.rs1)
+            AIMM-> Mux(is_csrc, Cat(Fill(XLEN - 5, 1.U(1.W)), ~ex_inst.rs1),
+                                Cat(Fill(XLEN - 5, 0.U(1.W)),  ex_inst.rs1))
         )
     )
     alu.io.b := MuxLookup(
         ex_inst.alu_src_b,
-        // ex_rs2_data,
         ex_rs2_true_data,
         Seq(
-            BIMM -> ex_inst.imm
+            BIMM -> ex_inst.imm,
+            BCSR -> MuxLookup( ex_inst.alu_op, csr.io.common_io.dout,
+                Seq( aluAdd.U -> 0.U(XLEN.W) ))
         )
     )
     alu.io.op := ex_inst.alu_op
@@ -198,14 +203,20 @@ class Backend extends Module with Config with AluOpType {
     // wb from lsu
     wb_lsu_data := io.dmem.douta
 
+    wb_result := Mux(ex_inst.which_fu === TOLSU, wb_lsu_data, wb_alu_data)
     wb_data := wb_result
     wb_inst   := ex_inst
-    wb_result := Mux(ex_inst.which_fu === TOLSU, wb_lsu_data, wb_alu_data)
 
     // write regfile
     regFile.io.wen_vec(0)     := Mux(wb_inst_valid, wb_inst.wb_dest === DREG, false.B)
     regFile.io.rd_addr_vec(0) := Mux(wb_inst_valid, wb_inst.rd, 0.U)
     regFile.io.rd_data_vec(0) := Mux(wb_inst_valid, wb_data, 0.U)
+
+    // write CSR
+    csr.io.common_io.wen := wb_inst_valid && wb_inst.which_fu === TOBJU && wb_inst.next_pc === PC4
+    csr.io.common_io.rd  := Mux(csr.io.common_io.wen, wb_inst.imm(12, 0), ex_inst.imm(12, 0))
+    csr.io.common_io.din := wb_csr_data
+    csr.io.event_io := DontCare // FIXME: For compile
 
     // debug signals
     io.bd.pc_is    := issue_inst.pc

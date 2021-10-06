@@ -58,6 +58,7 @@ class Decoder extends Module with Config with AluOpType {
     val u_imm     = Cat(io.inst(31, 12), 0.U(12.W))   // auipc, lui
     val j_imm     = Cat(Fill(XLEN - 21, io.inst(31)), io.inst(31), io.inst(19, 12), io.inst(20), io.inst(30, 21), 0.U(1.W))
     val shamt_imm = Cat(0.U((XLEN - 6).W), io.inst(25, 20))
+    val csr_imm   = Cat(0.U((XLEN - 12).W), io.inst(31, 20))
 
     // alu signals and sources
     // | alu_op | alu_src_a | alu_src_b | imm |
@@ -101,7 +102,17 @@ class Decoder extends Module with Config with AluOpType {
         BGEU -> List(aluSltu.U, AREG, BREG, DXXX, b_imm, BRANCH, BRGEU),
 
         JAL  -> List(aluAdd.U, AXXX, BREG, DREG, j_imm, JUMP,    BRXX),
-        JALR -> List(aluAdd.U, AREG, BIMM, DREG, i_imm, JUMPREG, BRXX)
+        JALR -> List(aluAdd.U, AREG, BIMM, DREG, i_imm, JUMPREG, BRXX),
+
+        MRET -> List(aluAdd.U, AXXX, BXXX, DXXX, x_imm, EPC,     BRXX),
+        ECALL-> List(aluAdd.U, AXXX, BXXX, DXXX, x_imm, TVEC,    BRXX),
+        
+        CSRRS  -> List(aluOr.U,  AREG, BCSR, DREG, csr_imm, PC4, BRXX),
+        CSRRC  -> List(aluAnd.U, AREG, BCSR, DREG, csr_imm, PC4, BRXX),
+        CSRRW  -> List(aluAdd.U, AREG, BCSR, DREG, csr_imm, PC4, BRXX),
+        CSRRSI -> List(aluOr.U,  AIMM, BCSR, DREG, csr_imm, PC4, BRXX),
+        CSRRCI -> List(aluAnd.U, AIMM, BCSR, DREG, csr_imm, PC4, BRXX),
+        CSRRWI -> List(aluAdd.U, AIMM, BCSR, DREG, csr_imm, PC4, BRXX)
     )
     val bju_signal = ListLookup(
         io.inst, List(aluAdd.U, AXXX, BXXX, DXXX, x_imm, PC4, BREQ),
@@ -141,6 +152,16 @@ class Decoder extends Module with Config with AluOpType {
         BGE   -> List(false.B ,  TOBJU),
         BLTU  -> List(false.B ,  TOBJU),
         BGEU  -> List(false.B ,  TOBJU),
+
+        MRET  -> List(false.B ,  TOBJU),
+        ECALL -> List(false.B ,  TOBJU),
+
+        CSRRS -> List(false.B ,  TOBJU),
+        CSRRC -> List(false.B ,  TOBJU),
+        CSRRW -> List(false.B ,  TOBJU),
+        CSRRSI-> List(false.B ,  TOBJU),
+        CSRRCI-> List(false.B ,  TOBJU),
+        CSRRWI-> List(false.B ,  TOBJU),
 
         LB    -> List(false.B ,  TOLSU),
         LH    -> List(false.B ,  TOLSU),

@@ -24,7 +24,8 @@ object InstMacro {
     val BRANCH  = 1.U(3.W)
     val JUMP    = 2.U(3.W)
     val JUMPREG = 3.U(3.W)
-    val TRAP    = 4.U(3.W)
+    val TVEC    = 4.U(3.W)
+    val EPC     = 5.U(3.W)
     val NEXT_PC_SIZE  = PC4.getWidth
 
     // to which fu
@@ -44,7 +45,7 @@ object InstMacro {
     val BXXX = 0.U(2.W)
     val BREG = 0.U(2.W)
     val BIMM = 1.U(2.W)
-    
+    val BCSR = 2.U(2.W)
     val ALU_B_SIZE = BXXX.getWidth
 
     // Mem signals && infos
