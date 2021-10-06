@@ -163,10 +163,7 @@ object CSRMask {
 
 class MstatusStruct extends Bundle with Config {
   val SD     = UInt(1.W)
-  val WPRI36 = UInt((MXLEN - 37).W)
-  val SXL    = UInt(2.W)
-  val UXL    = UInt(2.W)
-  val WPRI23 = UInt(9.W)
+  val WPRI23 = UInt(8.W)
   val TSR    = UInt(1.W)
   val TW     = UInt(1.W)
   val TVM    = UInt(1.W)
@@ -258,25 +255,25 @@ class McauseStruct extends Bundle with Config {
 }
 
 
-class SstatusStruct extends Bundle with Config {
-  val SD     = UInt(1.W)
-  val WPRI34 = UInt((SXLEN - 35).W)
-  val UXL    = UInt(2.W)
-  val WPRI20 = UInt(12.W)
-  val MXR    = UInt(1.W)
-  val SUM    = UInt(1.W)
-  val WPRI17 = UInt(1.W)
-  val XS     = UInt(2.W)
-  val FS     = UInt(2.W)
-  val WPRI9  = UInt(4.W)
-  val SPP    = UInt(1.W)
-  val WPRI6  = UInt(2.W)
-  val SPIE   = UInt(1.W)
-  val UPIE   = UInt(1.W)
-  val WPRI2  = UInt(2.W)
-  val SIE    = UInt(1.W)
-  val UIE    = UInt(1.W)
-}
+// class SstatusStruct extends Bundle with Config {
+//   val SD     = UInt(1.W)
+//   val WPRI34 = UInt((SXLEN - 35).W)
+//   val UXL    = UInt(2.W)
+//   val WPRI20 = UInt(12.W)
+//   val MXR    = UInt(1.W)
+//   val SUM    = UInt(1.W)
+//   val WPRI17 = UInt(1.W)
+//   val XS     = UInt(2.W)
+//   val FS     = UInt(2.W)
+//   val WPRI9  = UInt(4.W)
+//   val SPP    = UInt(1.W)
+//   val WPRI6  = UInt(2.W)
+//   val SPIE   = UInt(1.W)
+//   val UPIE   = UInt(1.W)
+//   val WPRI2  = UInt(2.W)
+//   val SIE    = UInt(1.W)
+//   val UIE    = UInt(1.W)
+// }
 
 class StvecStruct extends Bundle with Config {
   val BASE = UInt((SXLEN - 2).W)
@@ -314,14 +311,14 @@ class ScauseStruct extends Bundle with Config {
   val Code      = UInt((SXLEN - 1).W)
 }
 
-class SatpStruct extends Bundle {
-  val MODE = UInt(4.W)
-  val ASID = UInt(16.W)
-  val PPN  = UInt(44.W)
+// class SatpStruct extends Bundle {
+//   val MODE = UInt(4.W)
+//   val ASID = UInt(16.W)
+//   val PPN  = UInt(44.W)
 
-  def checkMode(satp: UInt): Bool = {
-    val mode = satp.asTypeOf(new SatpStruct).MODE
-    mode === 0.U || mode === 8.U
-  }
-}
+//   def checkMode(satp: UInt): Bool = {
+//     val mode = satp.asTypeOf(new SatpStruct).MODE
+//     mode === 0.U || mode === 8.U
+//   }
+// }
 

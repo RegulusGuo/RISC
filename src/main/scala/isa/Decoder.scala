@@ -105,7 +105,7 @@ class Decoder extends Module with Config with AluOpType {
         JALR -> List(aluAdd.U, AREG, BIMM, DREG, i_imm, JUMPREG, BRXX),
 
         MRET -> List(aluAdd.U, AXXX, BXXX, DXXX, x_imm, EPC,     BRXX),
-        ECALL-> List(aluAdd.U, AXXX, BXXX, DXXX, x_imm, TVEC,    BRXX),
+        ECALL-> List(aluAdd.U, AXXX, BXXX, DXXX, x_imm, MTVEC,   BRXX),
         
         CSRRS  -> List(aluOr.U,  AREG, BCSR, DREG, csr_imm, PC4, BRXX),
         CSRRC  -> List(aluAnd.U, AREG, BCSR, DREG, csr_imm, PC4, BRXX),

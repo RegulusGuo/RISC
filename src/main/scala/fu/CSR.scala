@@ -7,14 +7,19 @@ import isa._
 import utils._
 
 class CSREventIO extends Bundle with Config {
+    // inst
+    val is_mret          = Input(Bool())
     // exception
     val is_ecall         = Input(Bool())
     val illegal_inst     = Input(Bool())
     val mem_access_fault = Input(Bool())
+    val epc              = Input(UInt(XLEN.W))
     // interrupt
     val external_int     = Input(Bool())
     // tvec
     val redirect_pc      = Output(UInt(XLEN.W))
+    // from pipeline
+    val deal_with_int    = Input(Bool())
 }
 
 class CSRCommonIO extends Bundle with Config {
@@ -95,4 +100,49 @@ class CSR extends Module with Config {
     CSRMap.generate(mapping, addr, io.common_io.dout, wen, wdata)
 
     io.event_io.redirect_pc := 0.U(XLEN.W) // FIXME: For compile
+
+    // Branch
+    val ret_target = WireDefault(0.U(XLEN.W))
+
+    when(io.event_io.is_mret) {
+        val old_mstatus = WireDefault(mstatus.asTypeOf(new MstatusStruct))
+        val new_mstatus = WireDefault(mstatus.asTypeOf(new MstatusStruct))
+        new_mstatus.MIE := old_mstatus.MPIE
+        new_mstatus.MPP := Privilege.U
+        new_mstatus.MPIE := 1.U
+        current_mode := old_mstatus.MPP
+        mstatus := new_mstatus.asUInt()
+        ret_target := mepc
+    }
+
+    // Exception & interrupt
+    val excp_vec = Wire(Vec(16, Bool()))
+    excp_vec.foreach(_ := false.B)
+    excp_vec(ExceptionCode.ecall_M) := current_mode === Privilege.M && io.event_io.is_ecall
+    excp_vec(ExceptionCode.load_access_fault) := io.event_io.mem_access_fault
+    excp_vec(ExceptionCode.illegal_inst) := io.event_io.illegal_inst
+    val excp_no = ExceptionCode.ExcpPriority.foldRight(0.U)((i: Int, sum: UInt) => Mux(excp_vec(i), i.U, sum))
+
+    val intr_vec = Wire(Vec(16, Bool()))
+    intr_vec.foreach(_ := false.B)
+    intr_vec(InterruptCode.M_external) := current_mode === Privilege.M && io.event_io.external_int
+    val intr_no = InterruptCode.InterruptPriority.foldRight(0.U)((i: UInt, sum: UInt) => Mux(intr_vec(i), i, sum))
+
+    val has_excp = excp_vec.asUInt.orR
+    val has_intr = intr_vec.asUInt.orR
+    val cause_no = Wire(UInt(XLEN.W))
+    cause_no := Mux(has_intr, intr_no, excp_no)
+    when (io.event_io.deal_with_int || has_excp) {
+        val old_mstatus = WireDefault(mstatus.asTypeOf(new MstatusStruct))
+        val new_mstatus = WireDefault(mstatus.asTypeOf(new MstatusStruct))
+
+        mcause := Cat(has_intr, cause_no(MXLEN - 2, 0))
+        new_mstatus.MPP := current_mode
+        new_mstatus.MPIE := old_mstatus.MIE
+        new_mstatus.MIE := 0.U
+        mepc := io.event_io.epc
+        current_mode := Privilege.M
+
+        mstatus := new_mstatus.asUInt()
+    }
 }

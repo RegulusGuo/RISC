@@ -216,7 +216,15 @@ class Backend extends Module with Config with AluOpType {
     csr.io.common_io.wen := wb_inst_valid && wb_inst.which_fu === TOBJU && wb_inst.next_pc === PC4
     csr.io.common_io.rd  := Mux(csr.io.common_io.wen, wb_inst.imm(12, 0), ex_inst.imm(12, 0))
     csr.io.common_io.din := wb_csr_data
-    csr.io.event_io := DontCare // FIXME: For compile
+
+    csr.io.event_io.is_mret      := wb_inst_valid && wb_inst.next_pc === MTVEC
+    csr.io.event_io.is_ecall     := wb_inst_valid && wb_inst.next_pc === EPC
+    csr.io.event_io.illegal_inst := wb_inst_valid && wb_inst.illegal_inst
+    // TODO
+    csr.io.event_io.mem_access_fault := false.B
+    csr.io.event_io.epc := 0.U
+    csr.io.event_io.external_int := false.B
+    csr.io.event_io.deal_with_int := false.B
 
     // debug signals
     io.bd.pc_is    := issue_inst.pc

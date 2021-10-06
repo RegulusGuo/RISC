@@ -24,7 +24,7 @@ object InstMacro {
     val BRANCH  = 1.U(3.W)
     val JUMP    = 2.U(3.W)
     val JUMPREG = 3.U(3.W)
-    val TVEC    = 4.U(3.W)
+    val MTVEC   = 4.U(3.W)
     val EPC     = 5.U(3.W)
     val NEXT_PC_SIZE  = PC4.getWidth
 
