@@ -16,7 +16,8 @@ class CSREventIO extends Bundle with Config {
     val epc              = Input(UInt(XLEN.W))
     // interrupt
     val external_int     = Input(Bool())
-    // tvec
+    // redirect
+    val trap_redirect    = Output(Bool())
     val redirect_pc      = Output(UInt(XLEN.W))
     // from pipeline
     val deal_with_int    = Input(Bool())
@@ -136,13 +137,25 @@ class CSR extends Module with Config {
         val old_mstatus = WireDefault(mstatus.asTypeOf(new MstatusStruct))
         val new_mstatus = WireDefault(mstatus.asTypeOf(new MstatusStruct))
 
+        val tval = MuxLookup(
+            cause_no, 0.U(XLEN.W),
+            Seq(
+                ExceptionCode.load_access_fault.U -> io.event_io.bad_address,
+                ExceptionCode.illegal_inst.U -> io.event_io.illegal_inst
+            )
+        )
+
         mcause := Cat(has_intr, cause_no(MXLEN - 2, 0))
         new_mstatus.MPP := current_mode
         new_mstatus.MPIE := old_mstatus.MIE
         new_mstatus.MIE := 0.U
         mepc := io.event_io.epc
         current_mode := Privilege.M
-
+        mtval := Mux(io.event_io.deal_with_int, 0.U(XLEN.W), tval)
         mstatus := new_mstatus.asUInt()
     }
+    val tvec        = mtvec
+    val trap_target = tvec & ~"h11".U(XLEN.W) + (tvec(0).asUInt() << 2) * cause_no
+    io.event_io.redirect_pc := Mux(has_excp || has_intr, trap_target, ret_target)
+    io.event_io.trap_redirect := io.event_io.deal_with_int || io.event_io.is_mret || has_excp
 }
