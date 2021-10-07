@@ -55,8 +55,8 @@ class Backend extends Module with Config with AluOpType {
     val ex_rs2_true_data = Wire(UInt(XLEN.W))
 
     val stall_ex    = WireDefault(false.B)
-    val redirect_ex = redirect_is
-    val alu_valid = Wire(Bool())
+    val redirect_ex = WireDefault(false.B)
+    val alu_valid   = Wire(Bool())
     
     val is_branch = ex_inst.next_pc === BRANCH
     val is_jump   = ex_inst.next_pc === JUMP || ex_inst.next_pc === JUMPREG
@@ -69,6 +69,8 @@ class Backend extends Module with Config with AluOpType {
     val lsu_valid = Wire(Bool())
     // val ls_addr = ex_rs1_data + ex_inst.imm
     val ls_addr = ex_rs1_true_data + ex_inst.imm
+
+    val ex_interrupt = RegInit(false.B)
 
     // WB
     val wb_inst = RegInit(nop)
@@ -83,6 +85,7 @@ class Backend extends Module with Config with AluOpType {
     val wb_result = Reg(UInt(XLEN.W))
     val wb_brj = RegInit(false.B)
     val wb_brj_pc = Reg(UInt(XLEN.W))
+    val wb_interrupt = RegInit(false.B)
 
     //----------ISSUE----------
     // issue_queue.io.enqStep := 1.U
@@ -93,14 +96,15 @@ class Backend extends Module with Config with AluOpType {
 
     // issue_queue.io.din(0)  := io.bf.ftob.ctrl
     // issue_inst := issue_queue.io.dout(0)
-    redirect_is := ex_brj
-    issue_inst := Mux(redirect_is || stall_is, nop, io.bf.ftob.ctrl)
+    // redirect_is := ex_brj || csr.io.event_io.trap_redirect
+    redirect_is := redirect_ex
+    issue_inst := Mux(redirect_is, nop, Mux(stall_is, issue_inst, io.bf.ftob.ctrl))
 
     // detect use after load (stall 1 cycle)
     // stall_is := issue_inst.which_fu === TOLSU && issue_inst.wb_dest === DREG &&
     //            (issue_inst.rd === io.bf.ftob.ctrl.rs1 || issue_inst.rd === io.bf.ftob.ctrl.rs2)
+    stall_is := stall_ex
     io.bf.btof.stall := stall_is
-    
     
     // from regfile
     rs1_fwd_data := rs1_data
@@ -130,8 +134,10 @@ class Backend extends Module with Config with AluOpType {
     rs2_data := regFile.io.rs_data_vec(1)
 
     //----------EX----------
-    ex_inst := Mux(redirect_ex, nop, issue_inst)
-    ex_inst_valid := true.B
+    val nop_with_pc = WireDefault(nop)
+    nop_with_pc.pc := issue_inst.pc
+    ex_inst := Mux(redirect_ex, nop, Mux(stall_ex, nop_with_pc, issue_inst))
+    ex_inst_valid := ~redirect_ex
     ex_rs1_data := rs1_fwd_data
     ex_rs2_data := rs2_fwd_data
     val reforward_rs1 = wb_inst.which_fu === TOLSU && wb_inst.wb_dest === DREG && (wb_inst.rd === ex_inst.rs1)
@@ -193,8 +199,19 @@ class Backend extends Module with Config with AluOpType {
 
     ex_inst_data_valid := Mux(ex_inst.which_fu === TOLSU, lsu_valid, alu_valid)
 
-    io.bf.btof.is_redirect := ex_brj
-    io.bf.btof.redirect_pc := ex_brj_pc
+    redirect_ex := ex_brj || csr.io.event_io.trap_redirect
+    io.bf.btof.is_redirect := redirect_is
+    io.bf.btof.redirect_pc := Mux(ex_brj, ex_brj_pc, csr.io.event_io.redirect_pc)
+
+    // CSR (mret & ecall)
+    def isMret(inst: CtrlInfo): Bool = {
+        inst.next_pc === EPC
+    }
+    def isEcall(inst: CtrlInfo): Bool = {
+        inst.next_pc === MTVEC
+    }
+    stall_ex := isMret(ex_inst) || isEcall(ex_inst)
+    ex_interrupt := ex_inst_valid && io.external_int
 
     //----------WB----------
     // wb from alu
@@ -206,6 +223,8 @@ class Backend extends Module with Config with AluOpType {
     wb_result := Mux(ex_inst.which_fu === TOLSU, wb_lsu_data, wb_alu_data)
     wb_data := wb_result
     wb_inst   := ex_inst
+    wb_inst_valid := ex_inst_valid
+    wb_interrupt  := wb_inst_valid && ex_interrupt
 
     // write regfile
     regFile.io.wen_vec(0)     := Mux(wb_inst_valid, wb_inst.wb_dest === DREG, false.B)
@@ -217,15 +236,17 @@ class Backend extends Module with Config with AluOpType {
     csr.io.common_io.rd  := Mux(csr.io.common_io.wen, wb_inst.imm(12, 0), ex_inst.imm(12, 0))
     csr.io.common_io.din := wb_csr_data
 
-    csr.io.event_io.is_mret      := wb_inst_valid && wb_inst.next_pc === MTVEC
-    csr.io.event_io.is_ecall     := wb_inst_valid && wb_inst.next_pc === EPC
+    // ecall & mret
+    csr.io.event_io.is_mret      := wb_inst_valid && isMret(wb_inst)
+    csr.io.event_io.is_ecall     := wb_inst_valid && isEcall(wb_inst)
     csr.io.event_io.illegal_inst := wb_inst_valid && wb_inst.illegal_inst
+
     // TODO
     csr.io.event_io.inst := DontCare
     csr.io.event_io.bad_address := DontCare
     csr.io.event_io.mem_access_fault := false.B
-    csr.io.event_io.epc := 0.U
-    csr.io.event_io.external_int := false.B
+    csr.io.event_io.epc := ex_inst.pc
+    csr.io.event_io.external_int := wb_interrupt
     csr.io.event_io.deal_with_int := false.B
 
     // debug signals

@@ -102,8 +102,6 @@ class CSR extends Module with Config {
     val addr  = io.common_io.rd
     CSRMap.generate(mapping, addr, io.common_io.dout, wen, wdata)
 
-    io.event_io.redirect_pc := 0.U(XLEN.W) // FIXME: For compile
-
     // Branch
     val ret_target = WireDefault(0.U(XLEN.W))
 

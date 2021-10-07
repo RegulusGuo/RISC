@@ -17,4 +17,5 @@ class Core extends Module with Config {
     io.debug.bd <> b.io.bd
     io.imem     <> f.io.imem
     io.dmem     <> b.io.dmem
+    b.io.external_int := io.interrupt
 }

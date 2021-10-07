@@ -45,6 +45,7 @@ class BackendIO extends Bundle with Config {
     val bf   = Flipped(new FrontBackIO)
     val bd   = new BackendDebugIO
     val dmem = Flipped(new DmemIO)
+    val external_int = Input(Bool())
 }
 
 class ImemIO extends Bundle with Config {
