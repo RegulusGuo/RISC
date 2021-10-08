@@ -54,7 +54,7 @@ class CSR extends Module with Config {
     val medeleg    = RegInit(0.U(MXLEN.W))
     val mideleg    = RegInit(0.U(MXLEN.W))
     val mie        = RegInit(0.U.asTypeOf(new MieStruct).asUInt())
-    val mtvec      = RegInit(0.U.asTypeOf(new MtevcStruct).asUInt())
+    val mtvec      = RegInit(0.U.asTypeOf(new MtvecStruct).asUInt())
     val mcounteren = RegInit(0.U.asTypeOf(new MScounterenStruct).asUInt())
 
     val mscratch = RegInit(0.U(MXLEN.W))
@@ -155,7 +155,7 @@ class CSR extends Module with Config {
         mstatus := new_mstatus.asUInt()
     }
     val tvec        = mtvec
-    val trap_target = tvec & ~"h11".U(XLEN.W) + (tvec(0).asUInt() << 2) * cause_no
+    val trap_target = tvec & ~"h3".U(XLEN.W) + (tvec(0).asUInt() << 2) * cause_no
     io.event_io.redirect_pc := Mux(has_excp || has_intr, trap_target, ret_target)
     io.event_io.trap_redirect := io.event_io.deal_with_int || io.event_io.is_mret || has_excp
 }

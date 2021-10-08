@@ -197,7 +197,7 @@ class MstatusStruct extends Bundle with Config {
   }
 }
 
-class MtevcStruct extends Bundle with Config {
+class MtvecStruct extends Bundle with Config {
   val BASE = UInt((MXLEN - 2).W)
   val MODE = UInt(2.W)
 }

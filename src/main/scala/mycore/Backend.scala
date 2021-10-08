@@ -234,6 +234,7 @@ class Backend extends Module with Config with AluOpType {
     // write CSR
     csr.io.common_io.wen := wb_inst_valid && wb_inst.which_fu === TOBJU && wb_inst.next_pc === PC4
     csr.io.common_io.rd  := Mux(csr.io.common_io.wen, wb_inst.imm(12, 0), ex_inst.imm(12, 0))
+    wb_csr_data := alu.io.res
     csr.io.common_io.din := wb_csr_data
 
     // ecall & mret
@@ -245,7 +246,7 @@ class Backend extends Module with Config with AluOpType {
     csr.io.event_io.inst := DontCare
     csr.io.event_io.bad_address := DontCare
     csr.io.event_io.mem_access_fault := false.B
-    csr.io.event_io.epc := ex_inst.pc
+    csr.io.event_io.epc := wb_inst.pc
     csr.io.event_io.external_int := wb_interrupt
     csr.io.event_io.deal_with_int := false.B
 

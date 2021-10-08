@@ -59,7 +59,7 @@ class Frontend(addr_width: Int = 32, start_addr: String = "h00000000") extends M
     val stall_id    = WireDefault(false.B)
     val redirect_id = Wire(Bool())
     val decode_pc   = RegInit(UInt(addr_width.W), start_addr.U)
-    val decode_inst = RegInit(0.U(XLEN.W))
+    val decode_inst = RegInit(0x13.U(XLEN.W))
     
 
     // IF stage
@@ -77,7 +77,7 @@ class Frontend(addr_width: Int = 32, start_addr: String = "h00000000") extends M
     stall_id    := io.fb.btof.stall
     redirect_id := io.fb.btof.is_redirect
     decode_pc   := Mux(redirect_id, 0.U, imem_req_addr)  // actually this is not necessary, but this makes it easier for me to discover the bubble
-    decode_inst := Mux(redirect_id, 0.U, io.imem.spo)
+    decode_inst := Mux(redirect_id, 0x13.U, io.imem.spo)
     decoder.io.pc   := decode_pc
     decoder.io.inst := decode_inst
     io.fb.ftob.ctrl := Mux(redirect_id, nop, decoder.io.ctrl)
