@@ -136,7 +136,7 @@ class Backend extends Module with Config with AluOpType {
     //----------EX----------
     val nop_with_pc = WireDefault(nop)
     nop_with_pc.pc := issue_inst.pc
-    ex_inst := Mux(redirect_ex, nop, Mux(stall_ex, nop_with_pc, issue_inst))
+    ex_inst := Mux(ex_interrupt, nop_with_pc, Mux(redirect_ex || stall_ex, nop, issue_inst))
     ex_inst_valid := ~redirect_ex
     ex_rs1_data := rs1_fwd_data
     ex_rs2_data := rs2_fwd_data
@@ -164,8 +164,9 @@ class Backend extends Module with Config with AluOpType {
         ex_rs2_true_data,
         Seq(
             BIMM -> ex_inst.imm,
-            BCSR -> MuxLookup( ex_inst.alu_op, csr.io.common_io.dout,
-                Seq( aluAdd.U -> 0.U(XLEN.W) ))
+            BCSR -> MuxLookup( ex_inst.alu_op, 
+                        Mux(csrNeedForward(wb_inst, ex_inst), csr.io.common_io.din, csr.io.common_io.dout),
+                        Seq( aluAdd.U -> 0.U(XLEN.W) ))
         )
     )
     alu.io.op := ex_inst.alu_op
@@ -190,10 +191,19 @@ class Backend extends Module with Config with AluOpType {
     }
     ex_brj := Mux(ex_inst_valid, Mux(is_branch || is_jump, brj_taken, false.B), false.B)
     // lsu
-    io.dmem.addra := ls_addr
+    val max_addr = ls_addr + MuxLookup(
+        ex_inst.ls_width, 0.U,
+        Seq(
+            MEMHALF  -> 1.U,
+            MEMHALFU -> 1.U,
+            MEMWORD  -> 3.U
+        )
+    )
+    val ex_mem_req_valid = max_addr < 0x80.U // TODO magic number
+    io.dmem.addra := Mux(ex_mem_req_valid, ls_addr, 0.U)
     // io.dmem.dina  := ex_rs2_data
     io.dmem.dina  := ex_rs2_true_data
-    io.dmem.wea   := ex_inst.wb_dest === DMEM
+    io.dmem.wea   := ex_inst.wb_dest === DMEM && ex_mem_req_valid
     io.dmem.mem_u_b_h_w := ex_inst.ls_width
     io.dmem.clka := clock
 
@@ -203,25 +213,45 @@ class Backend extends Module with Config with AluOpType {
     io.bf.btof.is_redirect := redirect_is
     io.bf.btof.redirect_pc := Mux(ex_brj, ex_brj_pc, csr.io.event_io.redirect_pc)
 
-    // CSR (mret & ecall)
+    // CSR
     def isMret(inst: CtrlInfo): Bool = {
         inst.next_pc === EPC
     }
     def isEcall(inst: CtrlInfo): Bool = {
         inst.next_pc === MTVEC
     }
-    stall_ex := isMret(ex_inst) || isEcall(ex_inst)
+    def isCsrRW(inst: CtrlInfo): Bool = {
+        inst.next_pc === PC4 && inst.which_fu === TOBJU
+    }
+    // forwarding
+    def csrNeedForward(inst1: CtrlInfo, inst2: CtrlInfo): Bool = {
+        isCsrRW(inst1) && isCsrRW(inst2) && (inst1.imm(12, 0) === inst2.imm(12, 0))
+    }
+    // stall & interrupt
+    stall_ex := isMret(ex_inst) || isEcall(ex_inst) || 
+               (!ex_mem_req_valid && ex_inst.which_fu === TOLSU) || ex_inst.illegal_inst
     ex_interrupt := ex_inst_valid && io.external_int
 
     //----------WB----------
     // wb from alu
     wb_alu_data := Mux(ex_inst.wb_src === SPC || ex_inst.next_pc =/= PC4,
-                    ex_inst.pc + 4.U, alu.io.res)
+                    ex_inst.pc + 4.U, 
+                    MuxLookup(
+                        ex_inst.alu_src_b, alu.io.res,
+                        Seq(
+                            BCSR -> Mux(csrNeedForward(wb_inst, ex_inst), 
+                                        csr.io.common_io.din,
+                                        csr.io.common_io.dout)
+                        )
+                    )
+                )
     // wb from lsu
+    val wb_mem_req_valid = RegNext(ex_mem_req_valid)
+    val wb_ls_addr = RegNext(ls_addr)
     wb_lsu_data := io.dmem.douta
 
-    wb_result := Mux(ex_inst.which_fu === TOLSU, wb_lsu_data, wb_alu_data)
-    wb_data := wb_result
+    wb_result := Mux(ex_inst.which_fu === TOLSU, Mux(ex_mem_req_valid, wb_lsu_data, 0.U), wb_alu_data)
+    wb_data   := wb_result
     wb_inst   := ex_inst
     wb_inst_valid := ex_inst_valid
     wb_interrupt  := wb_inst_valid && ex_interrupt
@@ -238,17 +268,17 @@ class Backend extends Module with Config with AluOpType {
     csr.io.common_io.din := wb_csr_data
 
     // ecall & mret
-    csr.io.event_io.is_mret      := wb_inst_valid && isMret(wb_inst)
-    csr.io.event_io.is_ecall     := wb_inst_valid && isEcall(wb_inst)
-    csr.io.event_io.illegal_inst := wb_inst_valid && wb_inst.illegal_inst
-
+    csr.io.event_io.is_mret  := wb_inst_valid && isMret(wb_inst)
+    csr.io.event_io.is_ecall := wb_inst_valid && isEcall(wb_inst)
+    
     // TODO
-    csr.io.event_io.inst := DontCare
-    csr.io.event_io.bad_address := DontCare
-    csr.io.event_io.mem_access_fault := false.B
-    csr.io.event_io.epc := wb_inst.pc
-    csr.io.event_io.external_int := wb_interrupt
-    csr.io.event_io.deal_with_int := false.B
+    csr.io.event_io.illegal_inst     := wb_inst_valid && wb_inst.illegal_inst
+    csr.io.event_io.mem_access_fault := !wb_mem_req_valid && wb_inst.which_fu === TOLSU
+    csr.io.event_io.epc              := wb_inst.pc
+    csr.io.event_io.inst             := DontCare
+    csr.io.event_io.bad_address      := wb_ls_addr
+    csr.io.event_io.external_int     := wb_interrupt
+    csr.io.event_io.deal_with_int    := false.B
 
     // debug signals
     io.bd.pc_is    := issue_inst.pc
