@@ -63,8 +63,8 @@ object InstMacro {
     val SPC  = 3.U(2.W)
     val WB_SRC_SIZE = SXXX.getWidth
     // read or write (wb dest is reg or mem)
-    val DXXX = 0.U(1.W)
-    val DREG = 0.U(1.W)
-    val DMEM = 1.U(1.W)
+    val DXXX = 0.U(2.W)
+    val DREG = 1.U(2.W)
+    val DMEM = 2.U(2.W)
     val WB_DEST_SIZE = DXXX.getWidth
 }
