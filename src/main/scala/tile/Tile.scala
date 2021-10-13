@@ -40,7 +40,9 @@ class Tile extends Module with Config {
                 4.U  -> core.io.debug.fd.pc_id,
                 8.U  -> core.io.debug.bd.pc_is,
                 12.U -> core.io.debug.bd.pc_ex,
-                16.U -> core.io.debug.bd.pc_wb
+                16.U -> core.io.debug.bd.pc_wb,
+                20.U -> core.io.debug.bd.stall,
+                21.U -> core.io.debug.bd.redirect
             )
         )
     }.otherwise {

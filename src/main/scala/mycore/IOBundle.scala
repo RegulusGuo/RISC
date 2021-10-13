@@ -31,6 +31,10 @@ class BackendDebugIO extends Bundle with Config {
     val pc_is    = Output(UInt(XLEN.W))
     val pc_ex    = Output(UInt(XLEN.W))
     val pc_wb    = Output(UInt(XLEN.W))
+
+    val stall    = Output(Bool())
+    val redirect = Output(Bool())
+    
     val debug_addr = Input(UInt(7.W))
     val reg_data = Output(UInt(XLEN.W))
 }

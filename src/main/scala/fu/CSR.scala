@@ -26,10 +26,11 @@ class CSREventIO extends Bundle with Config {
 }
 
 class CSRCommonIO extends Bundle with Config {
-    val wen  = Input(Bool())
-    val din  = Input(UInt(XLEN.W))
-    val rd   = Input(UInt(CSRNumBits.W))
-    val dout = Output(UInt(XLEN.W))
+    val wen   = Input(Bool())
+    val din   = Input(UInt(XLEN.W))
+    val raddr = Input(UInt(CSRNumBits.W))
+    val waddr = Input(UInt(CSRNumBits.W))
+    val dout  = Output(UInt(XLEN.W))
 }
 
 class CSRIO extends Bundle with Config {
@@ -99,8 +100,9 @@ class CSR extends Module with Config {
     // Read / Write CSR
     val wdata = io.common_io.din
     val wen   = io.common_io.wen
-    val addr  = io.common_io.rd
-    CSRMap.generate(mapping, addr, io.common_io.dout, wen, wdata)
+    val raddr = io.common_io.raddr
+    val waddr = io.common_io.waddr
+    CSRMap.generate(mapping, raddr, io.common_io.dout, waddr, wen, wdata)
 
     // Branch
     val ret_target = WireDefault(0.U(XLEN.W))
