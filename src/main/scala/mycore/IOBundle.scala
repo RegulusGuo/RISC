@@ -34,6 +34,8 @@ class BackendDebugIO extends Bundle with Config {
 
     val stall    = Output(Bool())
     val redirect = Output(Bool())
+    val trap_redirect = Output(Bool())
+    val is_ecall = Output(Bool())
     
     val debug_addr = Input(UInt(7.W))
     val reg_data = Output(UInt(XLEN.W))

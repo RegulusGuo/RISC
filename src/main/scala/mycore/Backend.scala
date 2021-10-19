@@ -44,15 +44,15 @@ class Backend extends Module with Config with AluOpType {
     val redirect_is  = WireDefault(false.B)
 
     // EX
-    val alu = Module(new ALU)
+    val alu     = Module(new ALU)
     val ex_inst = RegInit(nop)
-    val ex_inst_valid = RegInit(false.B)
+    val ex_inst_valid      = RegInit(false.B)
     val ex_inst_data_valid = Wire(Bool())
-    val ex_rs1_data = Reg(UInt(XLEN.W))
-    val ex_rs2_data = Reg(UInt(XLEN.W))
+    val ex_rs1_data = RegInit(0.U(XLEN.W))
+    val ex_rs2_data = RegInit(0.U(XLEN.W))
 
-    val ex_rs1_true_data = Wire(UInt(XLEN.W))
-    val ex_rs2_true_data = Wire(UInt(XLEN.W))
+    val ex_rs1_true_data = WireDefault(0.U(XLEN.W))
+    val ex_rs2_true_data = WireDefault(0.U(XLEN.W))
 
     val stall_ex    = WireDefault(false.B)
     val redirect_ex = WireDefault(false.B)
@@ -60,32 +60,31 @@ class Backend extends Module with Config with AluOpType {
     
     val is_branch = ex_inst.next_pc === BRANCH
     val is_jump   = ex_inst.next_pc === JUMP || ex_inst.next_pc === JUMPREG
-    val ex_brj    = Wire(Bool())
+    val ex_brj    = WireDefault(false.B)
     val brj_taken = WireDefault(false.B)
-    val br_pc    = ex_inst.pc + ex_inst.imm
-    val jump_pc  = Wire(UInt(XLEN.W))
+    val br_pc     = ex_inst.pc + ex_inst.imm
+    val jump_pc   = Wire(UInt(XLEN.W))
     val ex_brj_pc = Mux(is_branch, Mux(brj_taken, br_pc, ex_inst.pc + 4.U), jump_pc)
     
     val lsu_valid = Wire(Bool())
-    // val ls_addr = ex_rs1_data + ex_inst.imm
     val ls_addr = ex_rs1_true_data + ex_inst.imm
 
     val ex_interrupt = RegInit(false.B)
 
     // WB
-    val wb_inst = RegInit(nop)
-    val wb_inst_valid = RegInit(true.B)
-    val stall_wb    = WireDefault(false.B)
-    val regFile = Module(new RegFile(len = 32, nread = 3, nwrite = 1))
-    val csr     = Module(new CSR)
-    val wb_csr_data = Reg(UInt(XLEN.W))
-    val wb_alu_data = Wire(UInt(XLEN.W))
-    val wb_lsu_data = Wire(UInt(XLEN.W))
-    val wb_data = Wire(UInt(XLEN.W))
-    val wb_result = Reg(UInt(XLEN.W))
-    val wb_brj = RegInit(false.B)
-    val wb_brj_pc = Reg(UInt(XLEN.W))
-    val wb_interrupt = RegInit(false.B)
+    val wb_inst       = RegInit(nop)
+    val wb_inst_valid = RegInit(false.B)
+    val stall_wb      = WireDefault(false.B)
+    val regFile       = Module(new RegFile(len = 32, nread = 3, nwrite = 1))
+    val csr           = Module(new CSR)
+    val wb_csr_data   = RegInit(0.U(XLEN.W))
+    val wb_alu_data   = Wire(UInt(XLEN.W))
+    val wb_lsu_data   = Wire(UInt(XLEN.W))
+    val wb_data       = Wire(UInt(XLEN.W))
+    val wb_result     = RegInit(0.U(XLEN.W))
+    val wb_brj        = RegInit(false.B)
+    val wb_brj_pc     = Reg(UInt(XLEN.W))
+    val wb_interrupt  = RegInit(false.B)
 
     //----------ISSUE----------
     // issue_queue.io.enqStep := 1.U
@@ -246,8 +245,10 @@ class Backend extends Module with Config with AluOpType {
                     )
                 )
     // wb from lsu
-    val wb_mem_req_valid = RegNext(ex_mem_req_valid)
-    val wb_ls_addr = RegNext(ls_addr)
+    val wb_mem_req_valid = RegInit(false.B)
+    wb_mem_req_valid := ex_mem_req_valid
+    val wb_ls_addr = RegInit(0.U(XLEN.W))
+    wb_ls_addr := ls_addr
     wb_lsu_data := io.dmem.douta
 
     wb_result := Mux(ex_inst.which_fu === TOLSU, Mux(ex_mem_req_valid, wb_lsu_data, 0.U), wb_alu_data)
@@ -288,6 +289,9 @@ class Backend extends Module with Config with AluOpType {
     io.bd.pc_wb    := wb_inst.pc
     io.bd.stall    := io.bf.btof.stall
     io.bd.redirect := io.bf.btof.is_redirect
+    io.bd.trap_redirect := csr.io.event_io.trap_redirect
+    io.bd.is_ecall := csr.io.event_io.is_ecall
+
     regFile.io.rs_addr_vec(2) := io.bd.debug_addr(4, 0)
     io.bd.reg_data := regFile.io.rs_data_vec(2)
 }
