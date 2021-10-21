@@ -9,6 +9,8 @@ import InstMacro._
 import ISA._
 
 class CtrlInfo extends Bundle with Config with AluOpType {
+    // inst
+    val inst = UInt(XLEN.W)
     // pc
     val pc = UInt(XLEN.W)
     val next_pc = UInt(NEXT_PC_SIZE.W)
@@ -199,6 +201,7 @@ class Decoder extends Module with Config with AluOpType {
                             control_signal_arr
                         )
 
+    io.ctrl.inst         := io.inst
     io.ctrl.pc           := io.pc
     io.ctrl.next_pc      := Mux(control_signal(1) === TOBJU, bju_signal(5), PC4)
     io.ctrl.illegal_inst := control_signal(0)

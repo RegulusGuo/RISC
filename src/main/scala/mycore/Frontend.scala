@@ -29,6 +29,7 @@ class Frontend(addr_width: Int = 32, start_addr: String = "h00000000") extends M
     val io = IO(new FrontendIO)
     val nop = {
         val tmp = Wire(new CtrlInfo)
+        tmp.inst := 0x13.U
         tmp.pc := 0.U
         tmp.next_pc := PC4
         tmp.illegal_inst := false.B

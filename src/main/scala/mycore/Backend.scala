@@ -14,6 +14,7 @@ class Backend extends Module with Config with AluOpType {
 
     val nop = {
         val tmp = Wire(new CtrlInfo)
+        tmp.inst := 0x13.U
         tmp.pc := 0.U
         tmp.next_pc := PC4
         tmp.illegal_inst := false.B
@@ -36,6 +37,7 @@ class Backend extends Module with Config with AluOpType {
     // val issue_queue  = Module(new FIFO(FIFO_SIZE, new CtrlInfo, 1.U, 1.U))
     // val issue_inst   = Wire(new CtrlInfo)
     val issue_inst   = RegInit(nop)
+    val issue_inst_valid = RegInit(false.B)
     val rs1_fwd_data = Wire(UInt(XLEN.W))
     val rs2_fwd_data = Wire(UInt(XLEN.W))
     val rs1_data     = Wire(UInt(XLEN.W))
@@ -98,6 +100,7 @@ class Backend extends Module with Config with AluOpType {
     // redirect_is := ex_brj || csr.io.event_io.trap_redirect
     redirect_is := redirect_ex
     issue_inst := Mux(redirect_is, nop, Mux(stall_is, issue_inst, io.bf.ftob.ctrl))
+    issue_inst_valid := ~redirect_is && ~stall_is
 
     // detect use after load (stall 1 cycle)
     // stall_is := issue_inst.which_fu === TOLSU && issue_inst.wb_dest === DREG &&
@@ -135,8 +138,8 @@ class Backend extends Module with Config with AluOpType {
     //----------EX----------
     val nop_with_pc = WireDefault(nop)
     nop_with_pc.pc := issue_inst.pc
-    ex_inst := Mux(ex_interrupt, nop_with_pc, Mux(redirect_ex || stall_ex, nop, issue_inst))
-    ex_inst_valid := ~redirect_ex
+    ex_inst := Mux(csr.io.event_io.validated_int, nop_with_pc, Mux(redirect_ex || stall_ex, nop, issue_inst))
+    ex_inst_valid := issue_inst_valid
     ex_rs1_data := rs1_fwd_data
     ex_rs2_data := rs2_fwd_data
     val reforward_rs1 = wb_inst.which_fu === TOLSU && wb_inst.wb_dest === DREG && (wb_inst.rd === ex_inst.rs1)
@@ -229,7 +232,7 @@ class Backend extends Module with Config with AluOpType {
     // stall & interrupt
     stall_ex := isMret(ex_inst) || isEcall(ex_inst) || 
                (!ex_mem_req_valid && ex_inst.which_fu === TOLSU) || ex_inst.illegal_inst
-    ex_interrupt := ex_inst_valid && io.external_int
+    ex_interrupt := csr.io.event_io.validated_int
 
     //----------WB----------
     // wb from alu
@@ -278,9 +281,9 @@ class Backend extends Module with Config with AluOpType {
     csr.io.event_io.illegal_inst     := wb_inst_valid && wb_inst.illegal_inst
     csr.io.event_io.mem_access_fault := !wb_mem_req_valid && wb_inst.which_fu === TOLSU
     csr.io.event_io.epc              := wb_inst.pc
-    csr.io.event_io.inst             := DontCare
+    csr.io.event_io.inst             := wb_inst.inst
     csr.io.event_io.bad_address      := wb_ls_addr
-    csr.io.event_io.external_int     := wb_interrupt
+    csr.io.event_io.external_int     := io.external_int
     csr.io.event_io.deal_with_int    := wb_interrupt
 
     // debug signals

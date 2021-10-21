@@ -187,6 +187,8 @@ class MstatusStruct extends Bundle with Config {
   def init(): UInt = {
     val bundle = WireDefault(0.U.asTypeOf(new MstatusStruct))
     bundle.MPP := Privilege.M // initialize MPP field
+    bundle.MIE := 1.U
+    bundle.MPIE := 1.U
     bundle.asUInt()
   }
 

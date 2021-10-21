@@ -18,6 +18,7 @@ class CSREventIO extends Bundle with Config {
     val epc              = Input(UInt(XLEN.W))
     // interrupt
     val external_int     = Input(Bool())
+    val validated_int    = Output(Bool())
     // redirect
     val trap_redirect    = Output(Bool())
     val redirect_pc      = Output(UInt(XLEN.W))
@@ -54,7 +55,7 @@ class CSR extends Module with Config {
     val mstatus    = RegInit((new MstatusStruct).init())
     val medeleg    = RegInit(0.U(MXLEN.W))
     val mideleg    = RegInit(0.U(MXLEN.W))
-    val mie        = RegInit(0.U.asTypeOf(new MieStruct).asUInt())
+    val mie        = RegInit(0xfff.U.asTypeOf(new MieStruct).asUInt())
     val mtvec      = RegInit(0.U.asTypeOf(new MtvecStruct).asUInt())
     val mcounteren = RegInit(0.U.asTypeOf(new MScounterenStruct).asUInt())
 
@@ -128,14 +129,17 @@ class CSR extends Module with Config {
 
     val intr_vec = Wire(Vec(16, Bool()))
     intr_vec.foreach(_ := false.B)
-    intr_vec(InterruptCode.M_external) := current_mode === Privilege.M && io.event_io.external_int
+    intr_vec(InterruptCode.M_external) := current_mode === Privilege.M && io.event_io.external_int && mstatus.asTypeOf(new MstatusStruct).MIE.asBool()
     val intr_no = InterruptCode.InterruptPriority.foldRight(0.U)((i: UInt, sum: UInt) => Mux(intr_vec(i), i, sum))
 
     val has_excp = excp_vec.asUInt.orR
     val has_intr = intr_vec.asUInt.orR
+    io.event_io.validated_int := has_intr
     val cause_no = Wire(UInt(XLEN.W))
     cause_no := Mux(has_intr, intr_no, excp_no)
-    when (io.event_io.deal_with_int || has_excp) {
+
+    val true_deal_with_int = io.event_io.deal_with_int && has_intr
+    when (true_deal_with_int || has_excp) {
         val old_mstatus = WireDefault(mstatus.asTypeOf(new MstatusStruct))
         val new_mstatus = WireDefault(mstatus.asTypeOf(new MstatusStruct))
 
@@ -159,5 +163,5 @@ class CSR extends Module with Config {
     val tvec        = mtvec
     val trap_target = tvec & ~"h3".U(XLEN.W) + (tvec(0).asUInt() << 2) * cause_no
     io.event_io.redirect_pc := Mux(has_excp || has_intr, trap_target, ret_target)
-    io.event_io.trap_redirect := io.event_io.deal_with_int || io.event_io.is_mret || has_excp
+    io.event_io.trap_redirect := true_deal_with_int || io.event_io.is_mret || has_excp
 }
