@@ -15,6 +15,7 @@ class BtoF extends Bundle with Config {
     val stall       = Output(Bool())
     val is_redirect = Output(Bool())
     val redirect_pc = Output(UInt(32.W))
+    val bpu_update  = Flipped(new BPUUpdate)
 }
 
 class FrontBackIO extends Bundle with Config {

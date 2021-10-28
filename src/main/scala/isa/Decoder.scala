@@ -14,6 +14,8 @@ class CtrlInfo extends Bundle with Config with AluOpType {
     // pc
     val pc = UInt(XLEN.W)
     val next_pc = UInt(NEXT_PC_SIZE.W)
+    // branch predict
+    val taken_predict = Bool()
     // illegal inst
     val illegal_inst = Bool()
     // regfile && imm
@@ -41,6 +43,7 @@ class CtrlInfo extends Bundle with Config with AluOpType {
 class DecoderIO extends Bundle with Config {
     val pc   = Input(UInt(XLEN.W))
     val inst = Input(UInt(32.W))
+    val taken_predict = Input(Bool())
     val ctrl = Output(new CtrlInfo)
 }
 
@@ -201,6 +204,7 @@ class Decoder extends Module with Config with AluOpType {
                             control_signal_arr
                         )
 
+    io.ctrl.taken_predict := io.taken_predict
     io.ctrl.inst         := io.inst
     io.ctrl.pc           := io.pc
     io.ctrl.next_pc      := Mux(control_signal(1) === TOBJU, bju_signal(5), PC4)

@@ -22,7 +22,7 @@ class RegFile(nregs: Int = 32, len: Int = 64, nread: Int = 6, nwrite: Int = 3, v
         io.rs_data_vec(i) := regs(io.rs_addr_vec(i))
     }
     for (i <- 0 until nwrite) {
-        when(io.wen_vec(i) && io.rd_addr_vec(i).orR) {
+        when(io.wen_vec(i)) {
             regs(io.rd_addr_vec(i)) := io.rd_data_vec(i)
         }
     }

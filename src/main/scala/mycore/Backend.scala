@@ -14,6 +14,7 @@ class Backend extends Module with Config with AluOpType {
 
     val nop = {
         val tmp = Wire(new CtrlInfo)
+        tmp.taken_predict := false.B
         tmp.inst := 0x13.U
         tmp.pc := 0.U
         tmp.next_pc := PC4
@@ -192,6 +193,17 @@ class Backend extends Module with Config with AluOpType {
         }
     }
     ex_brj := Mux(ex_inst_valid, Mux(is_branch || is_jump, brj_taken, false.B), false.B)
+    io.bf.btof.bpu_update.pc := ex_inst.pc
+    io.bf.btof.bpu_update.real_taken := ex_brj
+    io.bf.btof.bpu_update.real_target := ex_brj_pc
+    io.bf.btof.bpu_update.inst_type := MuxLookup(ex_inst.next_pc, bpuOTHER.U,
+                                                Seq(
+                                                    BRANCH  -> bpuBRANCH.U,
+                                                    JUMP    -> bpuJAL.U,
+                                                    JUMPREG -> bpuJALR.U
+                                                )
+                                            )
+
     // lsu
     val max_addr = ls_addr + MuxLookup(
         ex_inst.ls_width, 0.U,
@@ -201,7 +213,8 @@ class Backend extends Module with Config with AluOpType {
             MEMWORD  -> 3.U
         )
     )
-    val ex_mem_req_valid = max_addr < 0x80.U // TODO magic number
+    // val ex_mem_req_valid = max_addr < 0x8FFFFFFF.U // TODO magic number
+    val ex_mem_req_valid = true.B
     io.dmem.addra := Mux(ex_mem_req_valid, ls_addr, 0.U)
     // io.dmem.dina  := ex_rs2_data
     io.dmem.dina  := ex_rs2_true_data
@@ -211,7 +224,7 @@ class Backend extends Module with Config with AluOpType {
 
     ex_inst_data_valid := Mux(ex_inst.which_fu === TOLSU, lsu_valid, alu_valid)
 
-    redirect_ex := ex_brj || csr.io.event_io.trap_redirect
+    redirect_ex := (ex_brj && ex_inst.taken_predict === false.B ) || csr.io.event_io.trap_redirect
     io.bf.btof.is_redirect := redirect_is
     io.bf.btof.redirect_pc := Mux(ex_brj, ex_brj_pc, csr.io.event_io.redirect_pc)
 
@@ -263,7 +276,7 @@ class Backend extends Module with Config with AluOpType {
     // write regfile
     regFile.io.wen_vec(0)     := Mux(wb_inst_valid, wb_inst.wb_dest === DREG, false.B)
     regFile.io.rd_addr_vec(0) := Mux(wb_inst_valid, wb_inst.rd, 0.U)
-    regFile.io.rd_data_vec(0) := Mux(wb_inst_valid, wb_data, 0.U)
+    regFile.io.rd_data_vec(0) := Mux(wb_inst_valid && regFile.io.rd_addr_vec(0).orR, wb_data, 0.U)
 
     // read CSR
     csr.io.common_io.raddr := ex_inst.imm(12, 0)
