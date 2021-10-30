@@ -15,8 +15,9 @@ class Backend extends Module with Config with AluOpType {
     val nop = {
         val tmp = Wire(new CtrlInfo)
         tmp.taken_predict := false.B
+        tmp.target_predict := 0.U
         tmp.inst := 0x13.U
-        tmp.pc := 0.U
+        tmp.pc   := 0.U
         tmp.next_pc := PC4
         tmp.illegal_inst := false.B
         tmp.rs1 := 0.U
@@ -224,9 +225,10 @@ class Backend extends Module with Config with AluOpType {
 
     ex_inst_data_valid := Mux(ex_inst.which_fu === TOLSU, lsu_valid, alu_valid)
 
-    redirect_ex := (ex_brj && ex_inst.taken_predict === false.B ) || csr.io.event_io.trap_redirect
-    io.bf.btof.is_redirect := redirect_is
-    io.bf.btof.redirect_pc := Mux(ex_brj, ex_brj_pc, csr.io.event_io.redirect_pc)
+    redirect_ex := (ex_brj  && (ex_inst.taken_predict === false.B  || ex_inst.target_predict =/= ex_brj_pc)) ||
+                   (~ex_brj && (ex_inst.taken_predict === true.B)) 
+    io.bf.btof.is_redirect := redirect_ex || csr.io.event_io.trap_redirect
+    io.bf.btof.redirect_pc := Mux(redirect_ex, ex_brj_pc, csr.io.event_io.redirect_pc)
 
     // CSR
     def isMret(inst: CtrlInfo): Bool = {

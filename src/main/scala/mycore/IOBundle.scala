@@ -56,7 +56,7 @@ class BackendIO extends Bundle with Config {
 }
 
 class ImemIO extends Bundle with Config {
-    val a   = Input(UInt(7.W))
+    val a   = Input(UInt(8.W))
     val spo = Output(UInt(32.W))
 }
 
@@ -71,6 +71,8 @@ class DmemIO extends Bundle with Config {
     val wea   = Input(Bool())
     val douta = Output(UInt(32.W))
     val mem_u_b_h_w = Input(UInt(3.W))
+    val sim_uart_char_out = Output(UInt(8.W))
+    val sim_uart_char_valid = Output(Bool())
 }
 
 class CoreDebugIO extends Bundle with Config {

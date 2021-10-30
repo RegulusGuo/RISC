@@ -15,10 +15,11 @@ class PCGenIO extends Bundle with Config {
     val pc_redirect = Input(UInt(XLEN.W))
     val bpu_update  = new BPUUpdate
     val pc_o        = Output(UInt(XLEN.W))
-    val taken_predict_o = Output(Bool())
+    val taken_predict_o  = Output(Bool())
+    val target_predict_o = Output(UInt(XLEN.W))
 }
 
-class PCGen(start_addr: String = "h00000000") extends Module with Config {
+class PCGen(start_addr: String = "h80000000") extends Module with Config {
     val io = IO(new PCGenIO)
 
     val bpu = Module(new BPU)
@@ -30,16 +31,18 @@ class PCGen(start_addr: String = "h00000000") extends Module with Config {
     bpu.io.update <> io.bpu_update
     pc := next_pc
     io.pc_o := pc
-    io.taken_predict_o := bpu.io.resp.taken
+    io.taken_predict_o  := bpu.io.resp.taken
+    io.target_predict_o := target
 }
 
-class Frontend(start_addr: String = "h00000000") extends Module with Config with AluOpType {
+class Frontend(start_addr: String = "h80000000") extends Module with Config with AluOpType {
     val io = IO(new FrontendIO)
     val nop = {
         val tmp = Wire(new CtrlInfo)
-        tmp.taken_predict := false.B
+        tmp.taken_predict  := false.B
+        tmp.target_predict := 0.U
         tmp.inst := 0x13.U
-        tmp.pc := 0.U
+        tmp.pc   := 0.U
         tmp.next_pc := PC4
         tmp.illegal_inst := false.B
         tmp.rs1 := 0.U
@@ -70,7 +73,8 @@ class Frontend(start_addr: String = "h00000000") extends Module with Config with
     val redirect_id = Wire(Bool())
     val decode_pc   = RegInit(UInt(XLEN.W), start_addr.U)
     val decode_inst = RegInit(0x13.U(XLEN.W))
-    val taken_predict = RegInit(false.B)
+    val taken_predict  = RegInit(false.B)
+    val target_predict = RegInit(0.U(XLEN.W))
 
     // IF stage
     stall_if := stall_id
@@ -82,17 +86,19 @@ class Frontend(start_addr: String = "h00000000") extends Module with Config with
     pcgen.io.bpu_update <> io.fb.btof.bpu_update
     stall_pc := Mux(stall_if, stall_pc, pcgen.io.pc_o)
     // 2) fetch inst
-    io.imem.a := imem_req_addr(8, 2)
+    io.imem.a := imem_req_addr(9, 2)
 
     // ID stage
     stall_id    := io.fb.btof.stall
     redirect_id := io.fb.btof.is_redirect
     decode_pc   := Mux(redirect_id, 0.U, imem_req_addr)  // actually this is not necessary, but this makes it easier for me to discover the bubble
     decode_inst := Mux(redirect_id, 0x13.U, io.imem.spo)
-    taken_predict := pcgen.io.taken_predict_o
+    taken_predict  := Mux(redirect_id, false.B, pcgen.io.taken_predict_o)
+    target_predict := Mux(redirect_id, 0.U,    pcgen.io.target_predict_o)
     decoder.io.pc   := decode_pc
     decoder.io.inst := decode_inst
-    decoder.io.taken_predict := taken_predict
+    decoder.io.taken_predict  := taken_predict
+    decoder.io.target_predict := target_predict
     io.fb.ftob.ctrl := Mux(redirect_id, nop, decoder.io.ctrl)
 
     io.fd.pc_if := imem_req_addr

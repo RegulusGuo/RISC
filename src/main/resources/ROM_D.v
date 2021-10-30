@@ -1,9 +1,9 @@
 module ROM_D(
-    input[6:0] a,
+    input[7:0] a,
     output[31:0] spo
 );
 
-    reg[31:0] inst_data[0:127];
+    reg[31:0] inst_data[0:255];
 
     initial	begin
         $readmemh("rom.hex", inst_data);
@@ -12,4 +12,3 @@ module ROM_D(
     assign spo = inst_data[a];
 
 endmodule
-

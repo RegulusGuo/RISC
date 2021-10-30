@@ -47,8 +47,8 @@ class BPU extends Module with Config {
     val fetch_taken  = bht.io.rs_data_vec(0)
     val fetch_target = btb.io.rs_data_vec(0)
 
-    val pc_tag_update   = io.update.pc(XLEN - 1, bhtIndexBits)
-    val pc_index_update = io.update.pc(bhtIndexBits - 1, 0)
+    val pc_tag_update   = io.update.pc(XLEN - 1, bhtIndexBits + 2)
+    val pc_index_update = io.update.pc(bhtIndexBits + 1, 2)
         
     // query
     when (valid && fetch_tag === pc_tag_req) { // hit
@@ -60,22 +60,24 @@ class BPU extends Module with Config {
     }
 
     // update
-    tag.io.wen_vec(0)     := io.update.inst_type =/= bpuOTHER.U
+    val need_update = io.update.inst_type =/= bpuOTHER.U
+    tag.io.wen_vec(0)     := need_update
     tag.io.rd_addr_vec(0) := pc_index_update
     tag.io.rd_data_vec(0) := Cat(true.B, pc_tag_update)
 
-    btb.io.wen_vec(0)     := io.update.inst_type =/= bpuOTHER.U
+    btb.io.wen_vec(0)     := need_update && io.update.real_taken
     btb.io.rd_addr_vec(0) := pc_index_update
-    btb.io.rd_data_vec(0) := io.update.real_target
+    btb.io.rd_data_vec(0) := io.update.real_target(XLEN - 1, 2)
 
-    bht.io.wen_vec(0)     := io.update.inst_type =/= bpuOTHER.U
+    bht.io.wen_vec(0)     := need_update
     bht.io.rd_addr_vec(0) := pc_index_update
     bht.io.rs_addr_vec(1) := pc_index_update
     val current_bht = bht.io.rs_data_vec(1)
     when (io.update.real_taken) {
-        bht.io.rd_data_vec(0) := MuxLookup(current_bht, current_bht + 1.U,
+        bht.io.rd_data_vec(0) := Mux(io.update.inst_type === bpuJAL.U, 3.U,
+            MuxLookup(current_bht, current_bht + 1.U,
             Seq( 3.U -> current_bht )
-        )
+        ))
     }.otherwise {
         bht.io.rd_data_vec(0) := MuxLookup(current_bht, current_bht - 1.U,
             Seq( 0.U -> current_bht )

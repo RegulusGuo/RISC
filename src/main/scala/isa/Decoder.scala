@@ -16,6 +16,7 @@ class CtrlInfo extends Bundle with Config with AluOpType {
     val next_pc = UInt(NEXT_PC_SIZE.W)
     // branch predict
     val taken_predict = Bool()
+    val target_predict = UInt(XLEN.W)
     // illegal inst
     val illegal_inst = Bool()
     // regfile && imm
@@ -43,7 +44,8 @@ class CtrlInfo extends Bundle with Config with AluOpType {
 class DecoderIO extends Bundle with Config {
     val pc   = Input(UInt(XLEN.W))
     val inst = Input(UInt(32.W))
-    val taken_predict = Input(Bool())
+    val taken_predict  = Input(Bool())
+    val target_predict = Input(UInt(XLEN.W))
     val ctrl = Output(new CtrlInfo)
 }
 
@@ -204,52 +206,53 @@ class Decoder extends Module with Config with AluOpType {
                             control_signal_arr
                         )
 
-    io.ctrl.taken_predict := io.taken_predict
-    io.ctrl.inst         := io.inst
-    io.ctrl.pc           := io.pc
-    io.ctrl.next_pc      := Mux(control_signal(1) === TOBJU, bju_signal(5), PC4)
-    io.ctrl.illegal_inst := control_signal(0)
-    io.ctrl.rs1          := rs1
-    io.ctrl.rs2          := rs2
-    io.ctrl.rd           := rd
-    io.ctrl.imm          := MuxLookup(
-                                control_signal(1), x_imm,
-                                Seq(
-                                    TOALU -> alu_signal(3),
-                                    TOBJU -> bju_signal(4),
-                                    TOLSU -> MuxLookup(
-                                        lsu_signal(1), i_imm,
-                                        Seq( DREG -> i_imm, DMEM -> s_imm )
-                                    )
-                                )
-                            )
-    io.ctrl.which_fu  := control_signal(1)
-    io.ctrl.alu_op    := MuxLookup(
-                            control_signal(1), aluAdd.U,
-                            Seq( TOALU -> alu_signal(0), TOBJU -> bju_signal(0))
-                        )
-    io.ctrl.alu_src_a := MuxLookup(
-                            control_signal(1), AREG,
-                            Seq( TOALU -> alu_signal(1), TOBJU -> bju_signal(1))
-                        )
-    io.ctrl.alu_src_b := MuxLookup(
-                            control_signal(1), BREG,
-                            Seq( TOALU -> alu_signal(2), TOBJU -> bju_signal(2))
-                        )
-    io.ctrl.ls_width  := Mux(control_signal(1) === TOLSU, lsu_signal(0), MEMXXX)
-    io.ctrl.br_type   := Mux(control_signal(1) === TOBJU && bju_signal(5) === BRANCH, bju_signal(6), BRXX)
-    io.ctrl.wb_src    := MuxLookup(
-                            control_signal(1), SALU,
-                            Seq(
-                                TOLSU -> SMEM,
-                                TOBJU -> Mux(bju_signal(5) === JUMP || bju_signal(5) === JUMPREG, SPC, SXXX)
-                            )
-                        )
-    io.ctrl.wb_dest   := MuxLookup(
-                            control_signal(1), DREG,
-                            Seq(
-                                TOBJU -> bju_signal(3),
-                                TOLSU -> lsu_signal(1)
-                            )
-                        )
-}
+    io.ctrl.taken_predict  := io.taken_predict
+    io.ctrl.target_predict := io.target_predict
+    io.ctrl.inst           := io.inst
+    io.ctrl.pc             := io.pc
+    io.ctrl.next_pc        := Mux(control_signal(1) === TOBJU, bju_signal(5), PC4)
+    io.ctrl.illegal_inst   := control_signal(0)
+    io.ctrl.rs1            := rs1
+    io.ctrl.rs2            := rs2
+    io.ctrl.rd             := rd
+    io.ctrl.imm            := MuxLookup(
+                                  control_signal(1), x_imm,
+                                  Seq(
+                                      TOALU -> alu_signal(3),
+                                      TOBJU -> bju_signal(4),
+                                      TOLSU -> MuxLookup(
+                                          lsu_signal(1), i_imm,
+                                          Seq( DREG -> i_imm, DMEM -> s_imm )
+                                      )
+                                  )
+                              )
+    io.ctrl.which_fu       := control_signal(1)
+    io.ctrl.alu_op         := MuxLookup(
+                                 control_signal(1), aluAdd.U,
+                                 Seq( TOALU -> alu_signal(0), TOBJU -> bju_signal(0))
+                             )
+    io.ctrl.alu_src_a      := MuxLookup(
+                                 control_signal(1), AREG,
+                                 Seq( TOALU -> alu_signal(1), TOBJU -> bju_signal(1))
+                             )
+    io.ctrl.alu_src_b      := MuxLookup(
+                                 control_signal(1), BREG,
+                                 Seq( TOALU -> alu_signal(2), TOBJU -> bju_signal(2))
+                             )
+    io.ctrl.ls_width       := Mux(control_signal(1) === TOLSU, lsu_signal(0), MEMXXX)
+    io.ctrl.br_type        := Mux(control_signal(1) === TOBJU && bju_signal(5) === BRANCH, bju_signal(6), BRXX)
+    io.ctrl.wb_src         := MuxLookup(
+                                 control_signal(1), SALU,
+                                 Seq(
+                                     TOLSU -> SMEM,
+                                     TOBJU -> Mux(bju_signal(5) === JUMP || bju_signal(5) === JUMPREG, SPC, SXXX)
+                                 )
+                             )
+    io.ctrl.wb_dest        := MuxLookup(
+                                 control_signal(1), DREG,
+                                 Seq(
+                                     TOBJU -> bju_signal(3),
+                                     TOLSU -> lsu_signal(1)
+                                 )
+                             )
+}     
