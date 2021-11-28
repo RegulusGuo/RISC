@@ -1,5 +1,6 @@
 package config
 
+import chisel3.util._
 trait Config {
     val XLEN = 32
     val MXLEN      = 32
@@ -24,8 +25,8 @@ trait CacheConfig {
     val dataWidth     = 32   // == register size
     val nway          = 2
     val nline         = 64 // 256 before
-    val offsetBits    = 4
-    val indexBits     = 6  // 8 before
+    val offsetBits    = log2Ceil(cachelineBits >> 3)
+    val indexBits     = log2Ceil(nline)
     val tagBits       = addrWidth - offsetBits - indexBits
 }
 
