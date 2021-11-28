@@ -6,7 +6,7 @@ import chisel3.stage._
 import mycore._
 import fu._
 import isa._
-import mem._
+import cache._
 import mycore._
 import config.Config
 import scala.annotation.switch
@@ -16,23 +16,30 @@ class TileIO extends Bundle with Config {
     val step_en    = Input(Bool())
     val debug_addr = Input(UInt(7.W))
     val debug_data = Output(UInt(XLEN.W))
-    val sim_uart_char_out = Output(UInt(8.W))
-    val sim_uart_char_valid = Output(Bool())
+    // val sim_uart_char_out = Output(UInt(8.W))
+    // val sim_uart_char_valid = Output(Bool())
+    val cache_hit  = Output(Bool())
     val interrupt  = Input(Bool())
 }
 
 class Tile extends Module with Config {
     val io = IO(new TileIO)
 
-    val core = Module(new Core)
-    val imem = Module(new ROM_D)
+    val core   = Module(new Core)
+    val dcache = Module(new DCache)
+    val xbar = Module(new XBar)
     val dmem = Module(new RAM_B)
+    val imem = Module(new ROM_D)
     
     core.io.imem      <> imem.io
-    core.io.dmem      <> dmem.io
+    // core.io.dmem      <> dmem.io
+    core.io.dcache    <> dcache.io.cpu
+    xbar.io.dcache    <> dcache.io.bar
+    xbar.io.dmem      <> dmem.io
     core.io.interrupt <> io.interrupt
-    io.sim_uart_char_out   := dmem.io.sim_uart_char_out
-    io.sim_uart_char_valid := dmem.io.sim_uart_char_valid
+    io.cache_hit := dcache.io.dbg.hit
+    // io.sim_uart_char_out   := dmem.io.sim_uart_char_out
+    // io.sim_uart_char_valid := dmem.io.sim_uart_char_valid
     
     core.io.debug.bd.debug_addr := io.debug_addr
     when (io.debug_addr(5)) {

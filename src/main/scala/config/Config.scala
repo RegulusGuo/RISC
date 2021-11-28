@@ -17,3 +17,22 @@ trait Config {
     val bpuJAL    = 1
     val bpuOTHER  = 0
 }
+
+trait CacheConfig {
+    val cachelineBits = 128  // 16 Bytes
+    val addrWidth     = 32
+    val dataWidth     = 32   // == register size
+    val nway          = 2
+    val nline         = 64 // 256 before
+    val offsetBits    = 4
+    val indexBits     = 6  // 8 before
+    val tagBits       = addrWidth - offsetBits - indexBits
+}
+
+trait MemAccessType {
+    val MEMBYTE  = 0
+    val MEMHALF  = 1
+    val MEMWORD  = 2
+    val MEMDWORD = 3
+    val MEMTYPE  = 2
+}

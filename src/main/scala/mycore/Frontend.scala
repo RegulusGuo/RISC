@@ -6,8 +6,8 @@ import fu._
 import fu.AluOpType
 import isa._
 import InstMacro._
-import mem._
-import config.Config
+import cache._
+import config._
 
 class PCGenIO extends Bundle with Config {
     val is_redirect = Input(Bool())
@@ -19,7 +19,7 @@ class PCGenIO extends Bundle with Config {
     val target_predict_o = Output(UInt(XLEN.W))
 }
 
-class PCGen(start_addr: String = "h80000000") extends Module with Config {
+class PCGen(start_addr: String = "h00000000") extends Module with Config {
     val io = IO(new PCGenIO)
 
     val bpu = Module(new BPU)
@@ -35,7 +35,7 @@ class PCGen(start_addr: String = "h80000000") extends Module with Config {
     io.target_predict_o := target
 }
 
-class Frontend(start_addr: String = "h80000000") extends Module with Config with AluOpType {
+class Frontend(start_addr: String = "h00000000") extends Module with Config with AluOpType {
     val io = IO(new FrontendIO)
     val nop = {
         val tmp = Wire(new CtrlInfo)

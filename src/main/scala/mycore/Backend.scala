@@ -6,10 +6,11 @@ import fu._
 import fu.AluOpType
 import isa._
 import InstMacro._
-import mem._
-import config.Config
+import cache._
+import config._
+import scala.annotation.switch
 
-class Backend extends Module with Config with AluOpType {
+class Backend extends Module with Config with AluOpType with MemAccessType {
     val io = IO(new BackendIO)
 
     val nop = {
@@ -72,6 +73,7 @@ class Backend extends Module with Config with AluOpType {
     
     val lsu_valid = Wire(Bool())
     val ls_addr = ex_rs1_true_data + ex_inst.imm
+    val dcacheStall = Wire(Bool())
 
     val ex_interrupt = RegInit(false.B)
 
@@ -140,8 +142,9 @@ class Backend extends Module with Config with AluOpType {
     //----------EX----------
     val nop_with_pc = WireDefault(nop)
     nop_with_pc.pc := issue_inst.pc
-    ex_inst := Mux(csr.io.event_io.validated_int, nop_with_pc, Mux(redirect_ex || stall_ex, nop, issue_inst))
-    ex_inst_valid := issue_inst_valid
+    ex_inst := Mux(csr.io.event_io.validated_int, nop_with_pc, Mux(stall_wb, ex_inst, Mux(redirect_ex || stall_ex, nop, issue_inst)))
+    // ex_inst_valid := issue_inst_valid
+    ex_inst_valid := ~redirect_is && ~stall_is
     ex_rs1_data := rs1_fwd_data
     ex_rs2_data := rs2_fwd_data
     val reforward_rs1 = wb_inst.which_fu === TOLSU && wb_inst.wb_dest === DREG && (wb_inst.rd === ex_inst.rs1)
@@ -206,22 +209,54 @@ class Backend extends Module with Config with AluOpType {
                                             )
 
     // lsu
-    val max_addr = ls_addr + MuxLookup(
-        ex_inst.ls_width, 0.U,
-        Seq(
-            MEMHALF  -> 1.U,
-            MEMHALFU -> 1.U,
-            MEMWORD  -> 3.U
-        )
-    )
+    // val max_addr = ls_addr + MuxLookup(
+    //     ex_inst.ls_width, 0.U,
+    //     Seq(
+    //         MEMHALF  -> 1.U,
+    //         MEMHALFU -> 1.U,
+    //         MEMWORD  -> 3.U
+    //     )
+    // )
     // val ex_mem_req_valid = max_addr < 0x8FFFFFFF.U // TODO magic number
-    val ex_mem_req_valid = true.B
-    io.dmem.addra := Mux(ex_mem_req_valid, ls_addr, 0.U)
-    // io.dmem.dina  := ex_rs2_data
-    io.dmem.dina  := ex_rs2_true_data
-    io.dmem.wea   := ex_inst.wb_dest === DMEM && ex_mem_req_valid
-    io.dmem.mem_u_b_h_w := ex_inst.ls_width
-    io.dmem.clka := clock
+    // val ex_mem_req_valid = true.B
+    val ex_mem_req_valid = ex_inst.which_fu === TOLSU && (ex_inst_valid || !dcacheStall)
+    def mtype_trans(c: UInt): UInt = {
+        MuxLookup(c, MEMWORD.U,
+            Seq(
+                InstMacro.MEMBYTE  -> MEMBYTE.U,
+                InstMacro.MEMBYTEU -> MEMBYTE.U,
+                InstMacro.MEMHALF  -> MEMHALF.U,
+                InstMacro.MEMHALFU -> MEMHALF.U,
+                InstMacro.MEMWORD  -> MEMWORD.U,
+            )
+        )
+    }
+    val ex_mem_req_stall = RegInit({
+        val memReq = Wire(new CacheCoreReq)
+        memReq.mtype := MEMWORD.U
+        memReq.wen   := false.B
+        memReq.wdata := 0.U
+        memReq.addr  := 0.U
+        memReq
+    })
+    val ex_mem_req = {
+        val memReq = Wire(new CacheCoreReq)
+        memReq.mtype := mtype_trans(ex_inst.ls_width)
+        memReq.wdata := ex_rs2_true_data
+        memReq.addr  := ls_addr
+        memReq.wen   := ex_inst.wb_dest === DMEM && ex_mem_req_valid
+        memReq
+    }
+
+    val exLastMemReqValid = RegInit(false.B)
+    dcacheStall := exLastMemReqValid && !io.dcache.resp.valid
+    when (!dcacheStall) {
+        exLastMemReqValid := ex_mem_req_valid
+        ex_mem_req_stall  := ex_mem_req
+    }
+    io.dcache.req.bits   := Mux(dcacheStall, ex_mem_req_stall, ex_mem_req)
+    io.dcache.req.valid  := ex_mem_req_valid || dcacheStall
+    io.dcache.resp.ready := true.B
 
     ex_inst_data_valid := Mux(ex_inst.which_fu === TOLSU, lsu_valid, alu_valid)
 
@@ -245,8 +280,10 @@ class Backend extends Module with Config with AluOpType {
         isCsrRW(inst1) && isCsrRW(inst2) && (inst1.imm(12, 0) === inst2.imm(12, 0))
     }
     // stall & interrupt
-    stall_ex := isMret(ex_inst) || isEcall(ex_inst) || 
-               (!ex_mem_req_valid && ex_inst.which_fu === TOLSU) || ex_inst.illegal_inst
+    // stall_ex := isMret(ex_inst) || isEcall(ex_inst) || 
+    //        (!ex_mem_req_valid && ex_inst.which_fu === TOLSU) ||
+    //        ex_inst.illegal_inst || dcacheStall
+    stall_ex := dcacheStall
     ex_interrupt := csr.io.event_io.validated_int
 
     //----------WB----------
@@ -267,12 +304,27 @@ class Backend extends Module with Config with AluOpType {
     wb_mem_req_valid := ex_mem_req_valid
     val wb_ls_addr = RegInit(0.U(XLEN.W))
     wb_ls_addr := ls_addr
-    wb_lsu_data := io.dmem.douta
-
-    wb_result := Mux(ex_inst.which_fu === TOLSU, Mux(ex_mem_req_valid, wb_lsu_data, 0.U), wb_alu_data)
-    wb_data   := wb_result
-    wb_inst   := ex_inst
-    wb_inst_valid := ex_inst_valid
+    
+    val shift_bits = RegEnable((io.dcache.req.bits.addr(1, 0) << 3.U).asUInt(), !dcacheStall)
+    val cache_data = io.dcache.resp.bits.rdata.asUInt() >> shift_bits
+    wb_lsu_data := MuxLookup (
+        wb_inst.ls_width, 0.U,
+        Seq(
+            InstMacro.MEMBYTE  -> Cat(Fill(XLEN - 8, cache_data(7)), cache_data(7, 0)),
+            InstMacro.MEMBYTEU -> Cat(Fill(XLEN - 8, 0.U), cache_data(7, 0)),
+            InstMacro.MEMHALF  -> Cat(Fill(XLEN - 16, cache_data(15)), cache_data(15, 0)),
+            InstMacro.MEMHALFU -> Cat(Fill(XLEN - 16, 0.U), cache_data(15, 0)),
+            InstMacro.MEMWORD  -> cache_data(XLEN - 1, 0)
+        )
+    )
+    
+    stall_wb := dcacheStall
+    // wb_result := Mux(ex_inst.which_fu === TOLSU, Mux(ex_mem_req_valid, wb_lsu_data, 0.U), wb_alu_data)
+    wb_result := wb_alu_data
+    wb_data   := Mux(wb_inst.which_fu === TOLSU, Mux(wb_inst_valid || stall_wb, wb_lsu_data, 0.U), wb_result)
+    wb_inst   := Mux(stall_wb, wb_inst, ex_inst)
+    // wb_inst_valid := ex_inst_valid || stall_wb
+    wb_inst_valid := (~redirect_is && ~stall_is) || stall_wb
     wb_interrupt  := wb_inst_valid && ex_interrupt
 
     // write regfile
@@ -294,7 +346,8 @@ class Backend extends Module with Config with AluOpType {
     
     // TODO
     csr.io.event_io.illegal_inst     := wb_inst_valid && wb_inst.illegal_inst
-    csr.io.event_io.mem_access_fault := !wb_mem_req_valid && wb_inst.which_fu === TOLSU
+    // csr.io.event_io.mem_access_fault := !wb_mem_req_valid && wb_inst.which_fu === TOLSU
+    csr.io.event_io.mem_access_fault := false.B
     csr.io.event_io.epc              := wb_inst.pc
     csr.io.event_io.inst             := wb_inst.inst
     csr.io.event_io.bad_address      := wb_ls_addr
