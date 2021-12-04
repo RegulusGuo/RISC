@@ -17,6 +17,8 @@ trait Config {
     val bpuJALR   = 2
     val bpuJAL    = 1
     val bpuOTHER  = 0
+
+    val useGShare = false
 }
 
 trait CacheConfig {

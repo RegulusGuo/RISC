@@ -8,7 +8,10 @@ module RAM_B (
 	output wire [31:0] dout,
 	output wire stall,
 	output reg ack = 0,
-	output [2:0] ram_state
+	output [2:0] ram_state,
+
+	output [7:0] sim_uart_char_out,
+    output sim_uart_char_valid
 	);
 	
 	parameter
@@ -21,7 +24,8 @@ module RAM_B (
 		S_READ = 3,
 		S_WRITING1 = 4,
 		S_WRITING2 = 5,
-		S_WRITE = 6;
+		S_WRITE = 6,
+		SIM_UART_ADDR = 32'h10000000;
 	
 	reg [31:0] data [0:(1<<ADDR_WIDTH)-1];
 	
@@ -49,7 +53,7 @@ module RAM_B (
 	end
 
 	always @ (*) begin
-		if (cs) begin
+		if (cs && addr != SIM_UART_ADDR) begin
 			if (we) begin
 				if(state == S_IDLE)
 					next_state = S_WRITING1;
@@ -76,7 +80,7 @@ module RAM_B (
 
 	always @ (posedge clk) begin
 		if (state != S_READ && state != S_WRITE) begin
-			ack <= 0;
+			ack <= (addr == SIM_UART_ADDR);
 			out <= 0;
 		end
 
@@ -98,6 +102,21 @@ module RAM_B (
 
 	assign dout = out;
 	assign stall = cs & ~ack;
+
+	reg uart_addr_valid;
+    reg [7:0] uart_char;
+    initial begin
+        uart_addr_valid <= 0;
+    end
+    assign sim_uart_char_valid = uart_addr_valid;
+    assign sim_uart_char_out   = uart_char;
+    always @(posedge clk) begin
+        uart_addr_valid <= we & (addr == SIM_UART_ADDR);
+        uart_char <= din[7:0];
+        if (sim_uart_char_valid) begin
+            $write("%c", sim_uart_char_out);
+        end
+    end
 	
 endmodule
 

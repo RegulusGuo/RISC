@@ -86,6 +86,8 @@ class DmemIO extends Bundle with Config {
 	val stall = Output(Bool())
 	val ack   = Output(Bool())
 	val ram_state = Output(UInt(3.W))
+    val sim_uart_char_out = Output(UInt(8.W))
+    val sim_uart_char_valid = Output(Bool())
 }
 
 // from the view of cache
