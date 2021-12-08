@@ -195,6 +195,7 @@ class Backend extends Module with Config with AluOpType {
     }
     ex_brj := Mux(ex_inst_valid, Mux(is_branch || is_jump, brj_taken, false.B), false.B)
     io.bf.btof.bpu_update.pc := ex_inst.pc
+    io.bf.btof.bpu_update.inst := ex_inst.inst
     io.bf.btof.bpu_update.real_taken := ex_brj
     io.bf.btof.bpu_update.real_target := ex_brj_pc
     io.bf.btof.bpu_update.inst_type := MuxLookup(ex_inst.next_pc, bpuOTHER.U,

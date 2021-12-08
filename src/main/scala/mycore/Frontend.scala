@@ -25,7 +25,8 @@ class PCGen(start_addr: String = "h80000000") extends Module with Config {
     val bpu = Module(new BPU)
 
     val pc = RegInit(UInt(XLEN.W), start_addr.U)
-    val target = Cat(bpu.io.resp.target, 0.U(2.W))
+    // val target = Cat(bpu.io.resp.target, 0.U(2.W))
+    val target  = bpu.io.resp.target
     val next_pc = Mux(io.is_redirect, io.pc_redirect, Mux(io.is_stall, pc, Mux(bpu.io.resp.taken, target, pc + 4.U)))
     bpu.io.req.pc := pc
     bpu.io.update <> io.bpu_update

@@ -4,6 +4,7 @@
 .vscode/
 target/
 build/
+CachePrefetching/
 ### Project Specific stuff
 test_run_dir/*
 ### XilinxISE template

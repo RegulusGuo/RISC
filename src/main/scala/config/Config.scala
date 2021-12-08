@@ -8,7 +8,7 @@ trait Config {
     
     val FIFO_SIZE = 8
 
-    val bhtIndexBits = 7
+    val bhtIndexBits = 8
     val bhtEntryNum  = 1 << bhtIndexBits
     val bhtTagBits   = XLEN - bhtIndexBits - 2
 
