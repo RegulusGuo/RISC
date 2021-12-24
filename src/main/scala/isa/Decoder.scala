@@ -144,6 +144,24 @@ class Decoder extends Module with Config with AluOpType {
         lsu_signal_arr
     )
 
+    // | src_a | src_b | dst |
+    val mul_signal_arr = Array(
+        MUL -> List(AREG, BREG, DREG)
+    )
+    val mul_signal = ListLookup(
+        io.inst, List(AREG, BREG, DREG),
+        mul_signal_arr
+    )
+
+    // | src_a | src_b | dst |
+    val div_signal_arr = Array(
+        DIV -> List(AREG, BREG, DREG)
+    )
+    val div_signal = ListLookup(
+        io.inst, List(AREG, BREG, DREG),
+        div_signal_arr
+    )
+
     // alu or lsu
     val control_signal_arr = Array(
 
@@ -200,6 +218,9 @@ class Decoder extends Module with Config with AluOpType {
         SLLI  -> List(false.B ,  TOALU),
         SRLI  -> List(false.B ,  TOALU),
         SRAI  -> List(false.B ,  TOALU),
+
+        MUL   -> List(false.B ,  TOMUL),
+        DIV   -> List(false.B ,  TODIV)
     )
     val control_signal = ListLookup(
                             io.inst, List(true.B, TOALU),

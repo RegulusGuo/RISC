@@ -96,7 +96,8 @@ class BPUResp extends Bundle with Config {
 
 class BPUUpdate extends Bundle with Config {
     val pc          = Input(UInt(XLEN.W))
-    val inst        = Input(UInt(XLEN.W))
+    val is_ret      = Input(Bool())
+    val is_call     = Input(Bool())
     val inst_type   = Input(UInt(2.W))
     val real_taken  = Input(Bool())
     val real_target = Input(UInt(XLEN.W))
@@ -136,13 +137,6 @@ class BPU extends Module with Config {
     val bht = Module(new RegFile(nregs = bhtEntryNum, len = 4,              nread = 2, nwrite = 1)) // 1-bit call + 1-bit ret + 2-bit state predict
     val btb = Module(new RegFile(nregs = bhtEntryNum, len = XLEN - 2,       nread = 1, nwrite = 1)) //
     val ras = Module(new RAS(nRASEntries = 8))
-
-    def isCall(inst: UInt): Bool = {
-        inst(14, 0) === BitPat("b000000011100111") || inst(11, 0) === BitPat("b000011101111")
-    }
-    def isRet(inst: UInt): Bool = {
-        inst(31, 0) === BitPat("b00000000000000001000000001100111")
-    }
 
     val pc_tag_req    = io.req.pc(XLEN - 1, bhtIndexBits + 2)
     val pc_index_req  = io.req.pc(bhtIndexBits + 1, 2)
@@ -187,16 +181,11 @@ class BPU extends Module with Config {
     val current_bht = bht.io.rs_data_vec(1)(1, 0)
 
     when (io.update.real_taken) {
-        bht.io.rd_data_vec(0) := Cat(isCall(io.update.inst), isRet(io.update.inst), Mux(io.update.inst_type === bpuJAL.U, 3.U,
+        bht.io.rd_data_vec(0) := Cat(io.update.is_call, io.update.is_ret, Mux(io.update.inst_type === bpuJAL.U, 3.U,
             MuxLookup(current_bht, current_bht + 1.U,
             Seq( 3.U -> current_bht )
         )))
     }.otherwise {
         bht.io.rd_data_vec(0) := Cat(0.U(2.W), MuxLookup(current_bht, current_bht - 1.U, Seq( 0.U -> current_bht )))
     }
-    
-    // when (isCall(io.update.inst) && !bht.io.rs_data_vec(1)(3)) {
-    //     ras.io.push := true.B
-    //     ras.io.push_addr := io.update.pc + 4.U
-    // }
 }

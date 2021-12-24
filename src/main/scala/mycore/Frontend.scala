@@ -36,7 +36,7 @@ class PCGen(start_addr: String = "h80000000") extends Module with Config {
     io.target_predict_o := target
 }
 
-class Frontend(start_addr: String = "h80000000") extends Module with Config with AluOpType {
+class Frontend(start_addr: String = "h00000000") extends Module with Config with AluOpType {
     val io = IO(new FrontendIO)
     val nop = {
         val tmp = Wire(new CtrlInfo)
@@ -50,7 +50,7 @@ class Frontend(start_addr: String = "h80000000") extends Module with Config with
         tmp.rs2 := 0.U
         tmp.rd  := 0.U
         tmp.imm := 0.U
-        tmp.which_fu := TOALU
+        tmp.which_fu := TOXXX
         tmp.alu_op   := aluAdd.U
         tmp.alu_src_a := AXXX
         tmp.alu_src_b := BXXX
@@ -66,9 +66,11 @@ class Frontend(start_addr: String = "h80000000") extends Module with Config with
     val stall_if      = WireDefault(false.B)
     val stall_pc      = RegInit(UInt(XLEN.W), start_addr.U)
     val redirect_if   = Wire(Bool())
-    val imem_req_addr = Mux(stall_if, stall_pc, pcgen.io.pc_o)
+    val last_redir_if = RegInit(false.B)
+    // val imem_req_addr = Mux(redirect_if || !stall_if, pcgen.io.pc_o, stall_pc)
+    val imem_req_addr = Wire(UInt(XLEN.W))
 
-    //---------- ID ----------
+    //---------- ID & IS----------
     val decoder     = Module(new Decoder)
     val stall_id    = WireDefault(false.B)
     val redirect_id = Wire(Bool())
@@ -87,6 +89,14 @@ class Frontend(start_addr: String = "h80000000") extends Module with Config with
     pcgen.io.bpu_update <> io.fb.btof.bpu_update
     stall_pc := Mux(stall_if, stall_pc, pcgen.io.pc_o)
     // 2) fetch inst
+    last_redir_if := redirect_if
+    when (last_redir_if) {
+        imem_req_addr := pcgen.io.pc_o
+    }.elsewhen (stall_if) {
+        imem_req_addr := stall_pc
+    }.otherwise {
+        imem_req_addr := pcgen.io.pc_o
+    }
     io.imem.a := imem_req_addr(9, 2)
 
     // ID stage

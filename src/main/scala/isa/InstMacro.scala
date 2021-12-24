@@ -10,13 +10,13 @@ object InstMacro {
     val ALU_OP_SIZE    = 4
 
     // branch types
-    val BRXX  = 0.U(4.W)
-    val BREQ  = 1.U(4.W)
-    val BRNE  = 2.U(4.W)
-    val BRLT  = 3.U(4.W)
-    val BRGE  = 4.U(4.W)
-    val BRLTU = 5.U(4.W)
-    val BRGEU = 6.U(4.W)
+    val BRXX  = 0.U(3.W)
+    val BREQ  = 1.U(3.W)
+    val BRNE  = 2.U(3.W)
+    val BRLT  = 3.U(3.W)
+    val BRGE  = 4.U(3.W)
+    val BRLTU = 5.U(3.W)
+    val BRGEU = 6.U(3.W)
     val BR_TYPE_SIZE = BRXX.getWidth
     
     // next pc
@@ -29,10 +29,12 @@ object InstMacro {
     val NEXT_PC_SIZE  = PC4.getWidth
 
     // to which fu
-    val TOXXX = 0.U(2.W)
-    val TOALU = 0.U(2.W)
-    val TOBJU = 1.U(2.W)
-    val TOLSU = 2.U(2.W)
+    val TOXXX = 0.U(3.W)
+    val TOALU = 1.U(3.W)
+    val TOBJU = 2.U(3.W)
+    val TOLSU = 3.U(3.W)
+    val TOMUL = 4.U(3.W)
+    val TODIV = 5.U(3.W)
     val FU_TYPE_SIZE = TOXXX.getWidth
 
     // ALU src (port A)
