@@ -207,8 +207,8 @@ class Backend(nFu: Int = 6) extends Module with Config with AluOpType with FuNum
                         inst_is_ex.alu_src_a,
                         rs1_data,
                         Seq(
-                            APC  -> ex_inst.pc,
-                            AIMM -> Cat(Fill(XLEN - 5, 0.U(1.W)),  ex_inst.rs1)
+                            APC  -> inst_is_ex.pc,
+                            AIMM -> Cat(Fill(XLEN - 5, 0.U(1.W)),  inst_is_ex.rs1)
                         ))
                 alu.io.ALUB := MuxLookup(
                         inst_is_ex.alu_src_b,

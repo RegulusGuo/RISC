@@ -71,7 +71,7 @@ class Scoreboard(nFu: Int = 6) extends Module with Config with FuNum {
     }
     io.issue_wait := struc_hazard || waw || fus.busy(bjuNo) === true.B
     // RO stage
-    io.ro_rdy := (fus.rdy1(io.fu_ro) === 1.U && fus.rdy2(io.fu_ro) === 1.U) //&&
+    io.ro_rdy := (fus.rdy1(io.fu_ro) === 1.U || fus.rs1(io.fu_ro) === 0.U) && (fus.rdy2(io.fu_ro) === 1.U || fus.rs2(io.fu_ro) === 0.U) //&&
                 //  (rrs.regs(io.rs1_ro) === 0.U && rrs.regs(io.rs2_ro) === 0.U)
     // FU stage
     // WB stage
